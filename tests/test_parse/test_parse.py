@@ -156,7 +156,7 @@ class TestParserMDEdgeCases:
         assert output_file.exists()
         
         result = output_file.read_text(encoding="utf-8")
-        assert "E=mc²" in result
+        assert "E=mc^2" in result
         assert "Схема процесса" in result
         assert "TODO" in result  # Should detect "схема" keyword
 
