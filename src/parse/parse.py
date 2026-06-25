@@ -12,10 +12,10 @@ class ParserMD:
         self.theme_marp = theme
 
     def Parse_file_to_marp(self)-> None:
-        generator = self._open_file()
-        self._write_file(self.path_presentation, generator)
+        generator = self.__open_file()
+        self.__write_file(self.path_presentation, generator)
 
-    def _open_file(self) -> Generator[str, None, None]:
+    def __open_file(self) -> Generator[str, None, None]:
         """
         Private function for reading rows from .md file
         
@@ -28,7 +28,7 @@ class ParserMD:
                 if row:
                     yield row
 
-    def _write_file(self, path_presentation: Path, rows_generator: Generator[str, None, None])->None:
+    def __write_file(self, path_presentation: Path, rows_generator: Generator[str, None, None])->None:
         """
         Private function for writing rows to .md file
         """
@@ -61,7 +61,7 @@ class ParserMD:
         
         return marp_file_path
 
-    def _analyze_content_for_todos(self, row: str) -> str:
+    def __analyze_content_for_todos(self, row: str) -> str:
         """
         String analysis for TODO
         """
@@ -95,11 +95,10 @@ class ParserMD:
 
         
         # Skip empty row
-        new_rows = row+'\n'
+
         for todo_type, config in todo_patterns.items():
             if any(keyword in row.lower() for keyword in config['keywords']):
                 # Add TODO after row
-                new_rows += config['template'].format(row.strip())
-                break
+                return row + '\n' + config['template'].format(row.strip()) + '\n'
         
-        return new_rows
+        return row
