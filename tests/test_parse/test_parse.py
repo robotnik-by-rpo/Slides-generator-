@@ -1,117 +1,157 @@
-"""
-Unit tests for parse.py module - Core functionality only
-"""
 import pytest
 from pathlib import Path
+from unittest.mock import Mock, patch
+import requests
 from parse.parse import ParserMD
+
 
 class TestParserMDCore:
     """Core tests for ParserMD functionality"""
     
-    def test_init(self, temp_dir, sample_lesson_file):
+    def test_init(self, temp_dir, sample_lesson_file, mock_api_key):
         """Test valid initialization"""
         output_dir = temp_dir / "output"
         output_dir.mkdir(exist_ok=True)
-        parser = ParserMD(sample_lesson_file, output_dir, "default")
+        parser = ParserMD(sample_lesson_file, output_dir, "default", mock_api_key)
         
         assert parser.path_lesson == sample_lesson_file
         assert parser.path_presentation == output_dir
         assert parser.theme_marp == "default"
-        assert parser.title == ""
+        assert parser.api_key == mock_api_key
     
-    def test_open_file(self, parser_md, sample_lesson_file):
-        """Test opening a valid file"""
-        generator = parser_md._ParserMD__open_file()
-        rows = list(generator)
-        
-        expected_content = sample_lesson_file.read_text(encoding="utf-8").strip().split('\n')
-        expected_rows = [line.strip() for line in expected_content if line.strip()]
-        
-        assert len(rows) == len(expected_rows)
-        assert rows == expected_rows
-    
-    def test_analyze_todos(self, parser_md):
-        """Test TODO detection for keywords"""
-        test_cases = [
-            ("Это схема процесса", True, "изображение"),
-            ("Приведем пример использования", True, "пример"),
-            ("Вопрос для обсуждения", True, "вопрос"),
-            ("Выполните задание", True, "задание"),
-            ("Обычный текст", False, None),
-        ]
-        
-        for row, should_have_todo, keyword in test_cases:
-            result = parser_md._ParserMD__analyze_content_for_todos(row)
-            if should_have_todo:
-                assert "TODO" in result
-                assert keyword in result.lower()
-            else:
-                assert "TODO" not in result
-                assert result == row
-    
-    def test_parse_file_to_marp_creates_file(self, parser_md, temp_dir):
-        """Test that method creates the output file"""
-        output_file = temp_dir / "output" / "lesson.marp.md"
-        assert not output_file.exists()
-        
-        parser_md.Parse_file_to_marp()
-        
-        assert output_file.exists()
-    
-    def test_parse_file_to_marp_structure(self, parser_md, temp_dir):
-        """Test output file has correct structure"""
-        parser_md.Parse_file_to_marp()
-        
-        output_file = temp_dir / "output" / "lesson.marp.md"
-        content = output_file.read_text(encoding="utf-8")
-        lines = content.split('\n')
-        
-        # Check frontmatter
-        assert lines[0].strip() == "---"
-        assert "theme: default" in lines[1]
-        assert "size: 16:9" in lines[2]
-        assert lines[3].strip() == "---"
-        
-        # Check content preserved
-        assert "# Введение в программирование" in content
-        assert "## Основы Python" in content
-        assert "## Переменные и типы данных" in content
-    
-    def test_parse_file_to_marp_with_todos(self, temp_dir, lesson_with_todos_file):
-        """Test that TODOs are inserted correctly"""
+    def test_load_prompts(self, temp_dir, sample_lesson_file, mock_api_key):
+        """Test loading prompts from YAML file"""
         output_dir = temp_dir / "output"
         output_dir.mkdir(exist_ok=True)
-        parser = ParserMD(lesson_with_todos_file, output_dir, "default")
+        parser = ParserMD(sample_lesson_file, output_dir, "default", mock_api_key)
         
-        parser.Parse_file_to_marp()
+        assert "system" in parser.prompts
+        assert "user_template" in parser.prompts
+        assert len(parser.prompts["system"]) > 0
+    
+    def test_extract_title(self, parser_md):
+        """Test title extraction from content"""
+        content = "# Main Title\n\nContent here"
+        title = parser_md._extract_title(content)
+        assert title == "Main Title"
         
-        output_file = output_dir / "lesson_todos.marp.md"
-        content = output_file.read_text(encoding="utf-8")
+        content = "No headers here"
+        title = parser_md._extract_title(content)
+        assert title == "Presentation"
+
+
+class TestParserMDWithAI:
+    """Tests for AI-powered presentation generation"""
+    
+    @patch('requests.post')
+    def test_generate_presentation_success(self, mock_post, parser_md, mock_groq_response):
+        """Test successful presentation generation via Groq API"""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = mock_groq_response
+        mock_post.return_value = mock_response
         
-        # Check content preserved
-        assert "# Урок по анализу данных" in content
-        assert "## Введение" in content
-        assert "## Схема работы" in content
+        plan_content = parser_md._read_plan_file()
+        result = parser_md._generate_presentation_with_ai(plan_content)
         
-        # Check TODOs inserted for keywords
-        assert "TODO" in content
-        assert "схему" in content
-        assert "пример" in content
+        # Verify API call
+        mock_post.assert_called_once()
+        assert "marp: true" in result
+        assert f"theme: {parser_md.theme_marp}" in result
+        assert "Introduction to Programming" in result
+    
+    @patch('requests.post')
+    def test_generate_presentation_api_error(self, mock_post, parser_md):
+        """Test handling of API errors"""
+        mock_post.side_effect = requests.exceptions.RequestException("API Error")
+        
+        plan_content = parser_md._read_plan_file()
+        with pytest.raises(requests.exceptions.RequestException):
+            parser_md._generate_presentation_with_ai(plan_content)
+    
+    def test_generate_presentation_no_api_key(self, temp_dir, sample_lesson_file):
+        """Test behavior when API key is missing"""
+        output_dir = temp_dir / "output"
+        output_dir.mkdir(exist_ok=True)
+        parser = ParserMD(sample_lesson_file, output_dir, "default", "")
+        
+        plan_content = parser._read_plan_file()
+        with pytest.raises(ValueError, match="API key is required"):
+            parser._generate_presentation_with_ai(plan_content)
+    
+    @patch('requests.post')
+    def test_parse_file_to_marp_success(self, mock_post, parser_md, temp_dir, mock_groq_response):
+        """Test complete file parsing with AI generation"""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = mock_groq_response
+        mock_post.return_value = mock_response
+        
+        result_path = parser_md.parse_file_to_marp()
+        
+        assert result_path is not None
+        assert result_path.exists()
+        assert result_path.name == "lesson.marp.md"
+        
+        content = result_path.read_text(encoding="utf-8")
+        assert "marp: true" in content
+        assert "Introduction to Programming" in content
+
+
+class TestParserMDMetadata:
+    """Tests for metadata handling"""
+    
+    def test_add_metadata_when_missing(self, parser_md):
+        """Test adding metadata when none exists"""
+        content = "# Test Slide\n\nContent here"
+        result = parser_md._add_metadata(content)
+        
+        assert result.startswith("---")
+        assert "marp: true" in result
+        assert f"theme: {parser_md.theme_marp}" in result
+        assert "size: 16:9" in result
+    
+    def test_add_metadata_when_exists(self, parser_md):
+        """Test replacing existing metadata"""
+        content = """---
+theme: custom
+size: 4:3
+---
+# Test Slide
+"""
+        result = parser_md._add_metadata(content)
+        
+        assert "marp: true" in result
+        assert f"theme: {parser_md.theme_marp}" in result
+        assert "size: 16:9" in result
+        assert "theme: custom" not in result
+    
+    def test_save_marp_file(self, parser_md, temp_dir):
+        """Test saving Marp file"""
+        content = "# Test Presentation\n\nContent"
+        file_path = parser_md._save_marp_file(content)
+        
+        assert file_path.exists()
+        assert file_path.name == "lesson.marp.md"
+        
+        saved_content = file_path.read_text(encoding="utf-8")
+        assert saved_content == content
+
 
 class TestParserMDEdgeCases:
     """Test edge cases and error handling"""
     
-    def test_file_not_found(self, temp_dir):
+    def test_file_not_found(self, temp_dir, mock_api_key):
         """Test handling of missing file"""
         non_existent = temp_dir / "nonexistent.md"
         output_dir = temp_dir / "output"
         output_dir.mkdir(exist_ok=True)
         
-        with pytest.raises(FileNotFoundError):
-            parser = ParserMD(non_existent, output_dir, "default")
-            parser.Parse_file_to_marp()
+        parser = ParserMD(non_existent, output_dir, "default", mock_api_key)
+        result = parser.parse_file_to_marp()
+        assert result is None
     
-    def test_empty_file(self, temp_dir):
+    def test_empty_file(self, temp_dir, mock_api_key):
         """Test handling of empty file"""
         file_path = temp_dir / "empty.md"
         file_path.write_text("", encoding="utf-8")
@@ -119,51 +159,35 @@ class TestParserMDEdgeCases:
         output_dir = temp_dir / "output"
         output_dir.mkdir(exist_ok=True)
         
-        parser = ParserMD(file_path, output_dir, "default")
-        parser.Parse_file_to_marp()
+        parser = ParserMD(file_path, output_dir, "default", mock_api_key)
         
-        output_file = output_dir / "empty.marp.md"
-        assert output_file.exists()
-        
-        content = output_file.read_text(encoding="utf-8")
-        # Should only have frontmatter
-        assert "---" in content
-        assert "theme: default" in content
-        assert "size: 16:9" in content
+        with patch('requests.post') as mock_post:
+            mock_response = Mock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = {
+                "choices": [{"message": {"content": "# Empty Presentation"}}]
+            }
+            mock_post.return_value = mock_response
+            
+            result = parser.parse_file_to_marp()
+            assert result is not None
+            assert result.exists()
     
-    def test_special_characters(self, temp_dir):
-        """Test handling of special characters"""
-        content = """# Тест с символами
-
-## Спецсимволы: @#$%^&*()
-
-Текст с специальными символами
-
-## Формула: E=mc^2
-
-Схема процесса
-"""
-        file_path = temp_dir / "special.md"
-        file_path.write_text(content, encoding="utf-8")
+    @patch('requests.post')
+    def test_api_timeout(self, mock_post, parser_md):
+        """Test handling of API timeout"""
+        mock_post.side_effect = requests.exceptions.Timeout("Request timed out")
         
-        output_dir = temp_dir / "output"
-        output_dir.mkdir(exist_ok=True)
-        
-        parser = ParserMD(file_path, output_dir, "default")
-        parser.Parse_file_to_marp()
-        
-        output_file = output_dir / "special.marp.md"
-        assert output_file.exists()
-        
-        result = output_file.read_text(encoding="utf-8")
-        assert "E=mc^2" in result
-        assert "Схема процесса" in result
-        assert "TODO" in result  # Should detect "схема" keyword
+        plan_content = parser_md._read_plan_file()
+        with pytest.raises(requests.exceptions.Timeout):
+            parser_md._generate_presentation_with_ai(plan_content)
+
 
 class TestParserMDIntegration:
     """Integration tests for complete workflow"""
     
-    def test_full_workflow_preserves_order(self, temp_dir):
+    @patch('requests.post')
+    def test_full_workflow_preserves_order(self, mock_post, temp_dir, mock_api_key):
         """Test that content order is preserved"""
         content = """# First
 
@@ -181,43 +205,56 @@ Fifth content
         output_dir = temp_dir / "output"
         output_dir.mkdir(exist_ok=True)
         
-        parser = ParserMD(file_path, output_dir, "default")
-        parser.Parse_file_to_marp()
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "choices": [{"message": {"content": content}}]
+        }
+        mock_post.return_value = mock_response
         
-        output_file = output_dir / "order.marp.md"
-        result = output_file.read_text(encoding="utf-8")
+        parser = ParserMD(file_path, output_dir, "default", mock_api_key)
+        result = parser.parse_file_to_marp()
+        
+        assert result is not None
+        saved_content = result.read_text(encoding="utf-8")
         
         # Check order preserved
-        first_idx = result.find("# First")
-        second_idx = result.find("## Second")
-        third_idx = result.find("Third content")
-        fourth_idx = result.find("## Fourth")
-        fifth_idx = result.find("Fifth content")
+        first_idx = saved_content.find("# First")
+        second_idx = saved_content.find("## Second")
+        third_idx = saved_content.find("Third content")
+        fourth_idx = saved_content.find("## Fourth")
+        fifth_idx = saved_content.find("Fifth content")
         
         assert first_idx < second_idx < third_idx < fourth_idx < fifth_idx
     
-    def test_multiple_files_batch(self, temp_dir):
+    @patch('requests.post')
+    def test_multiple_files_batch(self, mock_post, temp_dir, mock_api_key):
         """Test processing multiple files"""
         output_dir = temp_dir / "output"
         output_dir.mkdir(exist_ok=True)
         
+        mock_response = Mock()
+        mock_response.status_code = 200
+        
         lessons = [
             ("lesson1.md", "# Lesson 1\n\n## Section A\n\nContent A"),
-            ("lesson2.md", "# Lesson 2\n\n## Section B\n\nСхема B"),
+            ("lesson2.md", "# Lesson 2\n\n## Section B\n\nContent B"),
         ]
         
         for filename, content in lessons:
             file_path = temp_dir / filename
             file_path.write_text(content, encoding="utf-8")
             
-            parser = ParserMD(file_path, output_dir, "default")
-            parser.Parse_file_to_marp()
+            mock_response.json.return_value = {
+                "choices": [{"message": {"content": content}}]
+            }
+            mock_post.return_value = mock_response
+            
+            parser = ParserMD(file_path, output_dir, "default", mock_api_key)
+            result = parser.parse_file_to_marp()
+            assert result is not None
         
         # Check all files were created
         for filename, _ in lessons:
             marp_file = output_dir / filename.replace(".md", ".marp.md")
             assert marp_file.exists()
-            
-            content = marp_file.read_text(encoding="utf-8")
-            assert "---" in content
-            assert "theme: default" in content
