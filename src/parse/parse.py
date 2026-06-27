@@ -37,7 +37,7 @@ class ParserMD:
         Raises:
             FileNotFoundError: If prompts file doesn't exist
         """
-        prompts_path = Path(__file__).parent.parent / 'prompts' / 'generate_presentation.yaml'
+        prompts_path = Path(__file__).parent.parent.parent / 'prompts' / 'generate_presentation.yaml'
         
         if not prompts_path.exists():
             raise FileNotFoundError(f"Prompts file not found: {prompts_path}")
