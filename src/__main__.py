@@ -1,16 +1,17 @@
 import argparse
 import sys
 from pathlib import Path
-from os.path import exists
 import os
 from parse.parse import ParserMD
 from metadata.metadata import Save_json_metadata
+from generate.generate import convert_to_marp
 import requests
 
 def main()->int:
     main_directory = Path(os.environ.get('SLIDES_OUTPUT_FOLDER'))
     lrs_url = os.environ.get('LRS_ENDPOINT')
     marp_theme = os.environ.get('THEME_MARP', "default")
+    api_ai = os.environ.get('API_AI')
     statement = "generated"
     xAPI = {}
 
@@ -60,9 +61,9 @@ def main()->int:
         
         # Creating output directory
         output_dir.mkdir(parents=True, exist_ok=True)        
-        parser_md = ParserMD(plan_path, output_dir, marp_theme)
+        parser_md = ParserMD(plan_path, output_dir, marp_theme,api_ai)
         parser_md.Parse_file_to_marp()
-
+        convert_to_marp(args.plan, args.format)
         return 0
     except Exception as e:
         print(e, file=sys.stderr)
@@ -84,10 +85,7 @@ def process_update_mode(directory: Path, format_choice: str)->int:
         for marp_file in marp_files:
             base_name = marp_file.stem.replace('.marp', '')
             print(f"Updating presentation for: {base_name}")
-            
-            # Здесь вызываем конвертацию через Marp CLI
-            # convert_to_format(marp_file, format_choice)
-            
+            convert_to_marp(marp_file,format_choice)
         return 0
         
     except Exception as e:
