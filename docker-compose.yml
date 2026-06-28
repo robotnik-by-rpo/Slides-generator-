@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  slider-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: slider-generator
+    environment:
+      - SLIDES_OUTPUT_FOLDER=/app/output
+      - THEME_MARP=default
+      - LRS_ENDPOINT=${LRS_ENDPOINT}
+      - LOGIN_LRS=${LOGIN_LRS}
+      - PASSWORD_LRS=${PASSWORD_LRS}
+      - API_AI=${API_AI}
+      - API_NEXTCLOUD=${API_NEXTCLOUD}
+      - LOGIN_NEXTCLOUD=${LOGIN_NEXTCLOUD}
+      - PASSWORD_NEXTCLOUD=${PASSWORD_NEXTCLOUD}
+      - FOLDER_NEXTCLOUD=${FOLDER_NEXTCLOUD}
+      - API_KEY_MARP=${API_KEY_MARP}
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+      - ./prompts:/app/prompts
+    working_dir: /app

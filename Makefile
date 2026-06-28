@@ -14,5 +14,11 @@ install: venv
 test: install
 	pytest tests -v
 
+docker-build:
+	docker compose build
+
+docker-up:
+
+
 e:
 	${pip3} install -e .
