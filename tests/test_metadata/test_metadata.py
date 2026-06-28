@@ -439,6 +439,7 @@ class TestSendNextCloud:
         }
         
         with patch.dict(os.environ, {
+            'API_NEXTCLOUD': 'https://your-nextcloud.com',
             'LOGIN_NEXTCLOUD': 'test_user',
             'PASSWORD_NEXTCLOUD': 'test_pass',
             'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
@@ -466,6 +467,7 @@ class TestSendNextCloud:
         }
         
         with patch.dict(os.environ, {
+            'API_NEXTCLOUD': 'https://your-nextcloud.com',
             'LOGIN_NEXTCLOUD': 'test_user',
             'PASSWORD_NEXTCLOUD': 'test_pass',
             'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
@@ -488,6 +490,7 @@ class TestSendNextCloud:
         }
         
         with patch.dict(os.environ, {
+            'API_NEXTCLOUD': 'https://your-nextcloud.com',
             'LOGIN_NEXTCLOUD': 'test_user',
             'PASSWORD_NEXTCLOUD': 'test_pass',
             'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
@@ -510,6 +513,7 @@ class TestSendNextCloud:
         }
         
         with patch.dict(os.environ, {
+            'API_NEXTCLOUD': 'https://your-nextcloud.com',
             'LOGIN_NEXTCLOUD': 'test_user',
             'PASSWORD_NEXTCLOUD': 'test_pass',
             'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
@@ -531,6 +535,7 @@ class TestSendNextCloud:
         }
         
         with patch.dict(os.environ, {
+            'API_NEXTCLOUD': 'https://your-nextcloud.com',
             'LOGIN_NEXTCLOUD': 'test_user',
             'PASSWORD_NEXTCLOUD': 'test_pass',
             'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
