@@ -76,6 +76,10 @@ class CLI:
             self.lesson = args.lesson
 
             
+            if args.update:
+                return self.process_update_mode(self.output_dir, args.format)
+
+
             # Проверка существования файла плана
             if not self.plan_path.exists() and not args.update:
                 raise FileNotFoundError(f"File .md doesn't exist: {args.plan}")
@@ -88,9 +92,6 @@ class CLI:
             convert_to_marp(path_marp_md, args.format, output_dir=self.output_dir, base_name=self.title)
             paths_metadata = {"plan": self.next_cloud_url.strip('/')+'/'+self.plan_path.stem}
             
-            if args.update:
-                return self.process_update_mode(self.output_dir, args.format)
-
             if args.format == "both":
                 paths_metadata['pdf'] = self.next_cloud_url.strip('/')+'/'+'presentation.pdf' 
                 paths_metadata['pptx'] = self.next_cloud_url.strip('/')+'/'+'presentation.pptx'
@@ -129,7 +130,7 @@ class CLI:
             
             save_json_metadata(xAPI, self.output_dir / "metadata.json")
             send_lrs(self.lrs_url,xAPI)
-            send_next_cloud(xAPI)
+            send_next_cloud(paths_metadata)
             return 0
         except Exception as e:
             print(e, file=sys.stderr)
@@ -195,7 +196,7 @@ class CLI:
             
             save_json_metadata(xAPI, self.output_dir / "metadata.json")
             send_lrs(self.lrs_url,xAPI)
-            send_next_cloud(xAPI)
+            send_next_cloud(paths_metadata)
             return 0
             
         except Exception as e:
