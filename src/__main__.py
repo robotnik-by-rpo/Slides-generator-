@@ -58,6 +58,10 @@ class CLI:
 
         args = parser.parse_args()
 
+        if not args.lesson:
+            print("Number lesson didn't point in flag --lesson")
+            return 1
+
         if args.update and args.plan:
             print("Many operation in one request")
             return 1
@@ -96,7 +100,7 @@ class CLI:
                     "mbox": "mailto:teacher@example.com",
                     },
                     "verb": {
-                        "id": self.lrs_url,
+                        "id": "http://adlnet.gov/expapi/verbs/generated",
                         "display": {
                             "ru": "Генерация презентации"
                         }
@@ -162,7 +166,7 @@ class CLI:
                     "mbox": "mailto:teacher@example.com",
                     },
                     "verb": {
-                        "id": self.lrs_url,
+                        "id": "http://adlnet.gov/expapi/verbs/updated",
                         "display": {
                             "ru": "Обновление презентации"
                         }
