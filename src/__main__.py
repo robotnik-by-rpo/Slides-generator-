@@ -2,6 +2,7 @@ import argparse
 import sys
 from pathlib import Path
 import os
+import json
 from parse.parse import ParserMD
 from metadata.metadata import save_json_metadata, send_lrs, send_next_cloud
 from generate.generate import convert_to_marp
@@ -73,7 +74,7 @@ class CLI:
             self.main_directory = Path(".")
 
         try:
-            self.plan_path = Path(args.plan)
+            self.plan_path = Path("" if args.plan is None else args.plan)
             self.output_dir = self.main_directory / Path(args.output)
             self.output_dir.mkdir(parents=True, exist_ok=True)            
             self.lesson = args.lesson
@@ -160,7 +161,7 @@ class CLI:
             self.title = self._extract_title_from_marp(marp_file)
             print(f"Updating presentation for: {base_name}")
             convert_to_marp(marp_file,format_choice,output_dir=directory,base_name=base_name)
-            paths_metadata = {"plan": self.next_cloud_url.strip('/')+'/'+self.plan_path.name}
+            paths_metadata = {"plan": self._get_plan_from_metadata(self.output_dir / "metadata.json")}
             if format_choice == "both":
                 paths_metadata['pdf'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pdf' 
                 paths_metadata['pptx'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pptx'
@@ -196,7 +197,6 @@ class CLI:
                     },
                     "timestamp": datetime.now().isoformat(timespec='seconds')
                 }
-            
             save_json_metadata(xAPI, self.output_dir / "metadata.json")
             send_lrs(self.lrs_url,xAPI)
             send_next_cloud(paths_metadata)
@@ -244,6 +244,19 @@ class CLI:
             print(f"Warning: Could not extract title from {marp_file}: {e}")
             return marp_file.stem.replace('.marp', '')
 
+    def _get_plan_from_metadata(self, file_path: str)->str:
+        """
+        Public method for getting plan from metadata
+        Args:
+            file_path: path to file
+        """
+        try:
+            with open(file_path, 'r', encoding='utf-8') as file:
+                data = json.load(file)
+                return data["context"]["extensions"]["plan_url"]
+        except Exception as e:
+            print("Json metadata doesn't exist in this directory",e)
+            return ""
 
 if __name__ == "__main__":
     cli = CLI()
