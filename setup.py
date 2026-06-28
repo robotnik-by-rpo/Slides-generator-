@@ -19,4 +19,7 @@ setup(
     
     install_requires=[
         "requests>=2.28",
+        "pyyaml",
+        "pyncclient",
+        "pytest",
     ],) 
