@@ -90,15 +90,15 @@ class CLI:
             path_marp_md = parser_md.Parse_file_to_marp()
             self.title = parser_md.title
             convert_to_marp(path_marp_md, args.format, output_dir=self.output_dir, base_name=self.title)
-            paths_metadata = {"plan": self.next_cloud_url.strip('/')+'/'+self.plan_path.stem}
+            paths_metadata = {"plan": self.next_cloud_url.strip('/')+'/'+self.plan_path.name}
             
             if args.format == "both":
-                paths_metadata['pdf'] = self.next_cloud_url.strip('/')+'/'+'presentation.pdf' 
-                paths_metadata['pptx'] = self.next_cloud_url.strip('/')+'/'+'presentation.pptx'
+                paths_metadata['pdf'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pdf' 
+                paths_metadata['pptx'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pptx'
             elif args.format == "pptx":
-                paths_metadata['pptx'] = self.next_cloud_url.strip('/')+'/'+'presentation.pptx'
+                paths_metadata['pptx'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pptx'
             elif args.format == "pdf":
-                paths_metadata['pdf'] = self.next_cloud_url.strip('/')+'/'+'presentation.pdf' 
+                paths_metadata['pdf'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pdf' 
 
             xAPI = {
                     "actor": {
@@ -145,26 +145,26 @@ class CLI:
             format_choice: format to saving
         """
         try:
-            marp_files = list(directory.glob("*.marp.md"))
+            marp_file = list(directory.glob("*.marp.md"))[0]
             
-            if not marp_files:
+            if not marp_file:
                 print(f"No .marp.md files found in {directory}")
                 return 1
                 
-            print(f"Found {len(marp_files)} .marp.md files to update")
             
-            for marp_file in marp_files:
-                base_name = marp_file.stem.replace('.marp', '')
-                print(f"Updating presentation for: {base_name}")
-                convert_to_marp(marp_file,format_choice)
-            paths_metadata = {"plan": self.next_cloud_url.strip('/')+'/'+self.plan_path.stem}
+            
+            base_name = marp_file.stem.replace('.marp', '')
+            self.title = self._extract_title_from_marp()
+            print(f"Updating presentation for: {base_name}")
+            convert_to_marp(marp_file,format_choice,output_dir=directory,base_name=base_name)
+            paths_metadata = {"plan": self.next_cloud_url.strip('/')+'/'+self.plan_path.name}
             if format_choice == "both":
-                paths_metadata['pdf'] = self.next_cloud_url.strip('/')+'/'+'presentation.pdf' 
-                paths_metadata['pptx'] = self.next_cloud_url.strip('/')+'/'+'presentation.pptx'
+                paths_metadata['pdf'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pdf' 
+                paths_metadata['pptx'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pptx'
             elif format_choice == "pptx":
-                paths_metadata['pptx'] = self.next_cloud_url.strip('/')+'/'+'presentation.pptx'
+                paths_metadata['pptx'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pptx'
             elif format_choice == "pdf":
-                paths_metadata['pdf'] = self.next_cloud_url.strip('/')+'/'+'presentation.pdf' 
+                paths_metadata['pdf'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pdf' 
 
             xAPI = {
                     "actor": {
@@ -202,7 +202,44 @@ class CLI:
         except Exception as e:
             print(f"Error in update mode: {e}", file=sys.stderr)
             return 1
+        
+    def _extract_title_from_marp(self, marp_file: Path) -> str:
+        """
+        Extracting title from marp-file was generated 
 
+        Args:
+            marp_file: path to file .marp.md
+
+        Returns:
+            string with title or file name without .marp.md, if title didn't found
+        """
+        try:
+            with open(marp_file, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+
+            in_yaml = False
+            content_start = 0
+
+            for i, line in enumerate(lines):
+                stripped = line.strip()
+                if stripped == '---':
+                    if not in_yaml:
+                        in_yaml = True
+                    else:
+                        content_start = i + 1
+                        break
+
+            for line in lines[content_start:]:
+                stripped = line.strip()
+                if stripped.startswith('# '):
+                    return stripped[2:].strip()
+                if stripped.startswith('## '):
+                    return stripped[3:].strip()
+            return marp_file.stem.replace('.marp', '')
+
+        except Exception as e:
+            print(f"Warning: Could not extract title from {marp_file}: {e}")
+            return marp_file.stem.replace('.marp', '')
 
 
 if __name__ == "__main__":
