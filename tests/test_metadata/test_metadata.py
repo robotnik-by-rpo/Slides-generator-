@@ -2,15 +2,18 @@ import json
 import pytest
 from pathlib import Path
 from datetime import datetime
-from src.metadata.metadata import Save_json_metadata
+from metadata.metadata import save_json_metadata
+from unittest.mock import Mock, patch, MagicMock, ANY
+from metadata.metadata import send_lrs, send_next_cloud
+import os
+
 
 
 class TestSaveJsonMetadata:
-    """Tests for Save_json_metadata function"""
+    """Tests for save_json_metadata function"""
     
     def test_save_valid_dict(self, tmp_path):
         """Test saving a valid dictionary to JSON file"""
-        # Arrange
         data = {
             "actor": {"mbox": "mailto:teacher@example.com"},
             "verb": {"id": "http://adlnet.gov/expapi/verbs/generated"},
@@ -19,10 +22,8 @@ class TestSaveJsonMetadata:
         }
         file_path = tmp_path / "metadata.json"
         
-        # Act
-        Save_json_metadata(data, file_path)
+        save_json_metadata(data, file_path)
         
-        # Assert
         assert file_path.exists()
         with open(file_path, 'r', encoding='utf-8') as f:
             saved_data = json.load(f)
@@ -30,7 +31,6 @@ class TestSaveJsonMetadata:
     
     def test_save_with_unicode(self, tmp_path):
         """Test saving with Unicode characters (Cyrillic)"""
-        # Arrange
         data = {
             "verb": {
                 "id": "http://adlnet.gov/expapi/verbs/generated",
@@ -44,10 +44,8 @@ class TestSaveJsonMetadata:
         }
         file_path = tmp_path / "unicode_metadata.json"
         
-        # Act
-        Save_json_metadata(data, file_path)
+        save_json_metadata(data, file_path)
         
-        # Assert
         with open(file_path, 'r', encoding='utf-8') as f:
             saved_data = json.load(f)
         assert saved_data == data
@@ -55,31 +53,24 @@ class TestSaveJsonMetadata:
     
     def test_pretty_formatting(self, tmp_path):
         """Test that JSON is saved with proper indentation (4 spaces)"""
-        # Arrange
         data = {"key": "value", "nested": {"inner": "data"}}
         file_path = tmp_path / "pretty.json"
         
-        # Act
-        Save_json_metadata(data, file_path)
+        save_json_metadata(data, file_path)
         
-        # Assert
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        # Verify indentation (4 spaces)
         assert '    "key"' in content
         assert '    "nested"' in content
         assert '        "inner"' in content
     
     def test_empty_dict(self, tmp_path):
         """Test saving an empty dictionary"""
-        # Arrange
         data = {}
         file_path = tmp_path / "empty.json"
         
-        # Act
-        Save_json_metadata(data, file_path)
+        save_json_metadata(data, file_path)
         
-        # Assert
         with open(file_path, 'r', encoding='utf-8') as f:
             saved_data = json.load(f)
         assert saved_data == {}
@@ -91,13 +82,11 @@ class TestSaveJsonMetadata:
         data = {
             "actor": {
                 "mbox": "mailto:teacher@example.com",
-                "name": "Иван Петров"
             },
             "verb": {
                 "id": "http://adlnet.gov/expapi/verbs/generated",
                 "display": {
                     "ru": "сгенерировал презентацию",
-                    "en": "generated presentation"
                 }
             },
             "object": {
@@ -105,7 +94,6 @@ class TestSaveJsonMetadata:
                 "definition": {
                     "name": {
                         "ru": "Урок 1: Введение",
-                        "en": "Lesson 1: Introduction"
                     },
                     "description": {
                         "ru": "Первый урок курса"
@@ -123,7 +111,7 @@ class TestSaveJsonMetadata:
         file_path = tmp_path / "xapi_statement.json"
         
         # Act
-        Save_json_metadata(data, file_path)
+        save_json_metadata(data, file_path)
         
         # Assert
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -139,12 +127,9 @@ class TestSaveJsonMetadata:
         initial_data = {"initial": "data"}
         new_data = {"new": "data"}
         
-        # Act - first write
-        Save_json_metadata(initial_data, file_path)
-        # Act - overwrite
-        Save_json_metadata(new_data, file_path)
+        save_json_metadata(initial_data, file_path)
+        save_json_metadata(new_data, file_path)
         
-        # Assert
         with open(file_path, 'r', encoding='utf-8') as f:
             saved_data = json.load(f)
         assert saved_data == new_data
@@ -152,7 +137,6 @@ class TestSaveJsonMetadata:
     
     def test_special_types_converted(self, tmp_path):
         """Test that special types are properly converted to JSON"""
-        # Arrange
         data = {
             "bool_true": True,
             "bool_false": False,
@@ -160,14 +144,12 @@ class TestSaveJsonMetadata:
             "int_value": 42,
             "float_value": 3.14,
             "list_value": [1, 2, 3],
-            "tuple_value": (1, 2, 3)  # tuple becomes list in JSON
+            "tuple_value": (1, 2, 3)
         }
         file_path = tmp_path / "types.json"
         
-        # Act
-        Save_json_metadata(data, file_path)
+        save_json_metadata(data, file_path)
         
-        # Assert
         with open(file_path, 'r', encoding='utf-8') as f:
             saved_data = json.load(f)
         assert saved_data["bool_true"] is True
@@ -176,50 +158,46 @@ class TestSaveJsonMetadata:
         assert saved_data["int_value"] == 42
         assert saved_data["float_value"] == 3.14
         assert saved_data["list_value"] == [1, 2, 3]
-        assert saved_data["tuple_value"] == [1, 2, 3]  # tuple converted to list
+        assert saved_data["tuple_value"] == [1, 2, 3]
 
 
 class TestSaveJsonMetadataErrors:
-    """Error handling tests for Save_json_metadata"""
+    """Error handling tests for save_json_metadata"""
     
     def test_unserializable_object(self, tmp_path):
         """Test that unserializable objects raise TypeError"""
-        # Arrange
         class CustomClass:
             def __init__(self, value):
                 self.value = value
         
         data = {
-            "custom": CustomClass("test")  # Unserializable object
+            "custom": CustomClass("test")
         }
         file_path = tmp_path / "unserializable.json"
         
-        # Assert
+
         with pytest.raises(TypeError):
-            Save_json_metadata(data, file_path)
+            save_json_metadata(data, file_path)
     
     def test_unserializable_set(self, tmp_path):
         """Test that sets (unserializable) raise TypeError"""
-        # Arrange
+    
         data = {
-            "set_value": {1, 2, 3}  # Set is not JSON serializable
+            "set_value": {1, 2, 3}
         }
         file_path = tmp_path / "set_error.json"
         
-        # Assert
+        
         with pytest.raises(TypeError):
-            Save_json_metadata(data, file_path)
+            save_json_metadata(data, file_path)
     
     def test_invalid_file_path(self):
         """Test that invalid file path raises FileNotFoundError"""
-        # Arrange
         data = {"test": "data"}
-        # Path to a non-existent directory
         invalid_path = Path("/nonexistent/directory/file.json")
-        
-        # Assert
+    
         with pytest.raises(FileNotFoundError):
-            Save_json_metadata(data, invalid_path)
+            save_json_metadata(data, invalid_path)
 
 
 class TestSaveJsonMetadataIntegration:
@@ -227,18 +205,14 @@ class TestSaveJsonMetadataIntegration:
     
     def test_full_xapi_statement(self, tmp_path):
         """Test saving a complete xAPI statement"""
-        # Arrange
         xapi_statement = {
             "actor": {
                 "mbox": "mailto:teacher@example.com",
-                "name": "Иван Петров",
-                "objectType": "Agent"
             },
             "verb": {
                 "id": "http://adlnet.gov/expapi/verbs/generated",
                 "display": {
                     "ru": "сгенерировал презентацию",
-                    "en": "generated presentation"
                 }
             },
             "object": {
@@ -246,11 +220,9 @@ class TestSaveJsonMetadataIntegration:
                 "definition": {
                     "name": {
                         "ru": "Урок 1: Введение в Python",
-                        "en": "Lesson 1: Introduction to Python"
                     },
                     "description": {
                         "ru": "Первый урок курса по Python",
-                        "en": "First lesson of Python course"
                     }
                 },
                 "objectType": "Activity"
@@ -276,15 +248,13 @@ class TestSaveJsonMetadataIntegration:
         }
         file_path = tmp_path / "xapi_full_statement.json"
         
-        # Act
-        Save_json_metadata(xapi_statement, file_path)
+    
+        save_json_metadata(xapi_statement, file_path)
         
-        # Assert
         assert file_path.exists()
         with open(file_path, 'r', encoding='utf-8') as f:
             saved = json.load(f)
         
-        # Verify structure
         assert "actor" in saved
         assert "verb" in saved
         assert "object" in saved
@@ -302,10 +272,10 @@ class TestSaveJsonMetadataIntegration:
             {"id": 3, "data": "third"}
         ]
         
-        # Act
+
         for i, statement in enumerate(statements):
             file_path = tmp_path / f"statement_{i}.json"
-            Save_json_metadata(statement, file_path)
+            save_json_metadata(statement, file_path)
         
         # Assert
         for i in range(3):
@@ -317,7 +287,6 @@ class TestSaveJsonMetadataIntegration:
     
     def test_xapi_example_from_spec(self, tmp_path):
         """Test saving the xAPI example from the specification"""
-        # Arrange - data from the provided example
         xapi_data = {
             "actor": {"mbox": "mailto:teacher@example.com"},
             "verb": {
@@ -337,10 +306,8 @@ class TestSaveJsonMetadataIntegration:
         }
         file_path = tmp_path / "xapi_example.json"
         
-        # Act
-        Save_json_metadata(xapi_data, file_path)
+        save_json_metadata(xapi_data, file_path)
         
-        # Assert
         with open(file_path, 'r', encoding='utf-8') as f:
             saved = json.load(f)
         
@@ -351,13 +318,225 @@ class TestSaveJsonMetadataIntegration:
         assert "slides_url" in saved["context"]["extensions"]
 
 
-# Fixtures for tests (can be moved to conftest.py)
-@pytest.fixture
-def sample_xapi_data():
-    """Fixture with sample xAPI data"""
-    return {
-        "actor": {"mbox": "mailto:teacher@example.com"},
-        "verb": {"id": "http://adlnet.gov/expapi/verbs/generated"},
-        "object": {"id": "urn:lesson:1234"},
-        "timestamp": "2026-06-25T12:00:00"
-    }
+
+class TestSendLRS:
+    """Tests for send_lrs function"""
+    
+    @patch('metadata.metadata.requests.post')
+    def test_send_lrs_success(self, mock_post, sample_xapi_statement):
+        """Test successful LRS data sending with sample xAPI statement"""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.text = '{"success": true}'
+        mock_post.return_value = mock_response
+        
+        url = "http://localhost:8100/xAPI/statements/"
+        
+        with patch.dict(os.environ, {'LOGIN_LRS': 'test_user', 'PASSWORD_LRS': 'test_pass'}):
+            send_lrs(url, sample_xapi_statement)
+        
+        # Используем ANY для auth, т.к. это реальный объект HTTPBasicAuth
+        mock_post.assert_called_once_with(
+            url,
+            json=sample_xapi_statement,
+            headers={'Content-Type': 'application/json'},
+            auth=ANY
+        )
+    
+    @patch('metadata.metadata.requests.post')
+    def test_send_lrs_server_error(self, mock_post, capsys):
+        """Test LRS sending with server error (500)"""
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.text = 'Internal Server Error'
+        mock_post.return_value = mock_response
+        
+        url = "http://localhost:8100/xAPI/statements/"
+        xapi_data = {"actor": {"mbox": "mailto:test@example.com"}}
+        
+        with patch.dict(os.environ, {'LOGIN_LRS': 'test_user', 'PASSWORD_LRS': 'test_pass'}):
+            send_lrs(url, xapi_data)
+        
+        captured = capsys.readouterr()
+        assert "Ошибка: 500" in captured.out
+        assert "Ответ сервера: Internal Server Error" in captured.out
+    
+    @patch('metadata.metadata.requests.post')
+    def test_send_lrs_bad_request(self, mock_post, capsys):
+        """Test LRS sending with bad request (400)"""
+        mock_response = Mock()
+        mock_response.status_code = 400
+        mock_response.text = 'Bad Request - Invalid xAPI statement'
+        mock_post.return_value = mock_response
+        
+        url = "http://localhost:8100/xAPI/statements/"
+        xapi_data = {"invalid": "data"}
+        
+        with patch.dict(os.environ, {'LOGIN_LRS': 'test_user', 'PASSWORD_LRS': 'test_pass'}):
+            send_lrs(url, xapi_data)
+        
+        captured = capsys.readouterr()
+        assert "Ошибка: 400" in captured.out
+        assert "Bad Request" in captured.out
+    
+    @patch('metadata.metadata.requests.post')
+    def test_send_lrs_with_complete_xapi(self, mock_post):
+        """Test sending a complete xAPI statement with all fields"""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.text = '{"statement_id": "123"}'
+        mock_post.return_value = mock_response
+        
+        url = "http://localhost:8100/xAPI/statements/"
+        xapi_statement = {
+            "actor": {
+                "mbox": "mailto:teacher@example.com",
+            },
+            "verb": {
+                "id": "http://adlnet.gov/expapi/verbs/generated",
+                "display": {
+                    "en": "generated presentation"
+                }
+            },
+            "object": {
+                "id": "urn:lesson:1234",
+                "definition": {
+                    "name": {
+                        "ru": "Урок 1: Введение",
+                    }
+                }
+            },
+            "context": {
+                "extensions": {
+                    "plan_url": "https://nextcloud/example/lesson1.md",
+                    "slides_url": "https://nextcloud/example/lesson1.pdf"
+                }
+            },
+            "timestamp": "2026-06-25T12:00:00"
+        }
+        
+        with patch.dict(os.environ, {'LOGIN_LRS': 'test_user', 'PASSWORD_LRS': 'test_pass'}):
+            send_lrs(url, xapi_statement)
+        
+        mock_post.assert_called_once()
+        _, kwargs = mock_post.call_args
+        assert kwargs['json'] == xapi_statement
+        assert kwargs['headers']['Content-Type'] == 'application/json'
+
+class TestSendNextCloud:
+    """Tests for send_next_cloud function"""
+    
+    @patch('metadata.metadata.nextcloud_client.Client')
+    def test_send_next_cloud_with_all_files(self, mock_client_class):
+        """Test successful upload with all three files (plan, pdf, pptx)"""
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+        
+        path_files = {
+            "plan": "/local/path/lesson1.md",
+            "pdf": "/local/path/lesson1.pdf",
+            "pptx": "/local/path/lesson1.pptx"
+        }
+        
+        with patch.dict(os.environ, {
+            'LOGIN_NEXTCLOUD': 'test_user',
+            'PASSWORD_NEXTCLOUD': 'test_pass',
+            'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
+        }):
+            send_next_cloud(path_files)
+        
+        mock_client_class.assert_called_once_with('https://your-nextcloud.com')
+        
+        # Login called with correct credentials
+        mock_client.login.assert_called_once_with('test_user', 'test_pass')
+        
+        assert mock_client.put_file.call_count == 3
+        mock_client.put_file.assert_any_call('/Documents/Lessons/', '/local/path/lesson1.md')
+        mock_client.put_file.assert_any_call('/Documents/Lessons/', '/local/path/lesson1.pdf')
+        mock_client.put_file.assert_any_call('/Documents/Lessons/', '/local/path/lesson1.pptx')
+    
+    @patch('metadata.metadata.nextcloud_client.Client')
+    def test_send_next_cloud_with_plan_only(self, mock_client_class):
+        """Test successful upload with only plan file"""
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+        
+        path_files = {
+            "plan": "/local/path/lesson1.md"
+        }
+        
+        with patch.dict(os.environ, {
+            'LOGIN_NEXTCLOUD': 'test_user',
+            'PASSWORD_NEXTCLOUD': 'test_pass',
+            'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
+        }):
+            send_next_cloud(path_files)
+        
+        mock_client.login.assert_called_once()
+        assert mock_client.put_file.call_count == 1
+        mock_client.put_file.assert_called_once_with('/Documents/Lessons/', '/local/path/lesson1.md')
+    
+    @patch('metadata.metadata.nextcloud_client.Client')
+    def test_send_next_cloud_with_plan_and_pdf(self, mock_client_class):
+        """Test successful upload with plan and pdf files"""
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+        
+        path_files = {
+            "plan": "/local/path/lesson1.md",
+            "pdf": "/local/path/lesson1.pdf"
+        }
+        
+        with patch.dict(os.environ, {
+            'LOGIN_NEXTCLOUD': 'test_user',
+            'PASSWORD_NEXTCLOUD': 'test_pass',
+            'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
+        }):
+            send_next_cloud(path_files)
+        
+        assert mock_client.put_file.call_count == 2
+        mock_client.put_file.assert_any_call('/Documents/Lessons/', '/local/path/lesson1.md')
+        mock_client.put_file.assert_any_call('/Documents/Lessons/', '/local/path/lesson1.pdf')
+    
+    @patch('metadata.metadata.nextcloud_client.Client')
+    def test_send_next_cloud_with_plan_and_pptx(self, mock_client_class):
+        """Test successful upload with plan and pptx files"""
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+        
+        path_files = {
+            "plan": "/local/path/lesson1.md",
+            "pptx": "/local/path/lesson1.pptx"
+        }
+        
+        with patch.dict(os.environ, {
+            'LOGIN_NEXTCLOUD': 'test_user',
+            'PASSWORD_NEXTCLOUD': 'test_pass',
+            'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
+        }):
+            send_next_cloud(path_files)
+        
+        assert mock_client.put_file.call_count == 2
+        mock_client.put_file.assert_any_call('/Documents/Lessons/', '/local/path/lesson1.md')
+        mock_client.put_file.assert_any_call('/Documents/Lessons/', '/local/path/lesson1.pptx')
+    
+    @patch('metadata.metadata.nextcloud_client.Client')
+    def test_send_next_cloud_handles_missing_files_gracefully(self, mock_client_class):
+        """Test that missing optional files are handled gracefully"""
+        mock_client = Mock()
+        mock_client_class.return_value = mock_client
+        
+        path_files = {
+            "plan": "/local/path/lesson1.md"
+        }
+        
+        with patch.dict(os.environ, {
+            'LOGIN_NEXTCLOUD': 'test_user',
+            'PASSWORD_NEXTCLOUD': 'test_pass',
+            'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
+        }):
+            send_next_cloud(path_files)
+        
+        mock_client.login.assert_called_once()
+        assert mock_client.put_file.call_count == 1
+        mock_client.put_file.assert_called_once_with('/Documents/Lessons/', '/local/path/lesson1.md')

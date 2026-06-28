@@ -62,3 +62,13 @@ def sample_xapi_statement():
         },
         "timestamp": "2026-06-25T12:00:00"
     }
+
+@pytest.fixture
+def sample_xapi_data():
+    """Fixture with sample xAPI data"""
+    return {
+        "actor": {"mbox": "mailto:teacher@example.com"},
+        "verb": {"id": "http://adlnet.gov/expapi/verbs/generated"},
+        "object": {"id": "urn:lesson:1234"},
+        "timestamp": "2026-06-25T12:00:00"
+    }
