@@ -41,7 +41,7 @@ def send_next_cloud(path_files: dict)->None:
     Args:
         path_files: dict for storing paths for saving files to next cloud
     """
-    nc = nextcloud_client.Client('https://your-nextcloud.com')
+    nc = nextcloud_client.Client(os.environ.get('API_NEXTCLOUD'))
     nc.login(os.environ.get('LOGIN_NEXTCLOUD'),os.environ.get('PASSWORD_NEXTCLOUD'))
     
     path_next_cloud = os.environ.get('FOLDER_NEXTCLOUD')
