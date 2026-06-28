@@ -28,7 +28,6 @@ class CLI:
 
         parser.add_argument(
             "--plan",
-            required=True,
             help = "Path to file of lesson",
         )
 
@@ -53,7 +52,8 @@ class CLI:
         parser.add_argument(
             "--lesson",
             default="undefine",
-            help="Numeration lesson"
+            help="Numeration lesson",
+            required=True,
         )
 
         args = parser.parse_args()
@@ -61,13 +61,25 @@ class CLI:
         if args.update and args.plan:
             print("Many operation in one request")
             return 1
+        
+        if not args.update and not args.plan:
+            print("Either --plan or --update must be specified")
+            return 1
+
+        if not self.main_directory:
+            self.main_directory = Path(".")
 
         try:
             self.plan_path = Path(args.plan)
             self.output_dir = self.main_directory / Path(args.output)
+            self.output_dir.mkdir(parents=True, exist_ok=True)            
             self.lesson = args.lesson
 
             
+            if args.update:
+                return self.process_update_mode(self.output_dir, args.format)
+
+
             # Проверка существования файла плана
             if not self.plan_path.exists() and not args.update:
                 raise FileNotFoundError(f"File .md doesn't exist: {args.plan}")
@@ -75,14 +87,11 @@ class CLI:
             # Creating output directory
             self.output_dir.mkdir(parents=True, exist_ok=True)        
             parser_md = ParserMD(self.plan_path, self.output_dir, self.marp_theme, self.api_ai)
-            parser_md.Parse_file_to_marp()
-            self.title = parser_md.title[0]
-            convert_to_marp(args.plan, args.format)
+            path_marp_md = parser_md.Parse_file_to_marp()
+            self.title = parser_md.title
+            convert_to_marp(path_marp_md, args.format, output_dir=self.output_dir, base_name=self.title)
             paths_metadata = {"plan": self.next_cloud_url.strip('/')+'/'+self.plan_path.stem}
             
-            if args.update:
-                return self.process_update_mode(self.output_dir, args.format)
-
             if args.format == "both":
                 paths_metadata['pdf'] = self.next_cloud_url.strip('/')+'/'+'presentation.pdf' 
                 paths_metadata['pptx'] = self.next_cloud_url.strip('/')+'/'+'presentation.pptx'
@@ -96,7 +105,7 @@ class CLI:
                     "mbox": "mailto:teacher@example.com",
                     },
                     "verb": {
-                        "id": self.lrs_url,
+                        "id": "http://adlnet.gov/expapi/verbs/generated",
                         "display": {
                             "ru": "Генерация презентации"
                         }
@@ -119,9 +128,9 @@ class CLI:
                     "timestamp": datetime.now().isoformat(timespec='seconds')
                 }
             
-            save_json_metadata(xAPI, self.output_dir)
+            save_json_metadata(xAPI, self.output_dir / "metadata.json")
             send_lrs(self.lrs_url,xAPI)
-            send_next_cloud(xAPI)
+            send_next_cloud(paths_metadata)
             return 0
         except Exception as e:
             print(e, file=sys.stderr)
@@ -162,7 +171,7 @@ class CLI:
                     "mbox": "mailto:teacher@example.com",
                     },
                     "verb": {
-                        "id": self.lrs_url,
+                        "id": "http://adlnet.gov/expapi/verbs/updated",
                         "display": {
                             "ru": "Обновление презентации"
                         }
@@ -185,9 +194,9 @@ class CLI:
                     "timestamp": datetime.now().isoformat(timespec='seconds')
                 }
             
-            save_json_metadata(xAPI, self.output_dir)
+            save_json_metadata(xAPI, self.output_dir / "metadata.json")
             send_lrs(self.lrs_url,xAPI)
-            send_next_cloud(xAPI)
+            send_next_cloud(paths_metadata)
             return 0
             
         except Exception as e:
