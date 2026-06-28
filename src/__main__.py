@@ -9,17 +9,20 @@ from datetime import datetime
 
 class CLI:
     def __init__(self):
-        self.main_directory = Path(os.environ.get('SLIDES_OUTPUT_FOLDER'))
-        self.lrs_url = os.environ.get('LRS_ENDPOINT')
-        self.marp_theme = os.environ.get('THEME_MARP', "default")
-        self.api_ai = os.environ.get('API_AI')
-        self.login_lrs = os.environ.get("LOGIN_LRS")
-        self.next_cloud_url = os.environ.get("API_NEXTCLOUD")
-        self.api_marp = os.environ.get('API_KEY_MARP') # In future
-        self.plan_path = ""
-        self.output_dir = ""
-        self.title = ""
-        self.lesson = ""
+        try:
+            self.main_directory = Path(os.environ.get('SLIDES_OUTPUT_FOLDER'))
+            self.lrs_url = os.environ.get('LRS_ENDPOINT')
+            self.marp_theme = os.environ.get('THEME_MARP', "default")
+            self.api_ai = os.environ.get('API_AI')
+            self.login_lrs = os.environ.get("LOGIN_LRS")
+            self.next_cloud_url = os.environ.get("API_NEXTCLOUD")
+            self.api_marp = os.environ.get('API_KEY_MARP') # In future
+            self.plan_path = ""
+            self.output_dir = ""
+            self.title = ""
+            self.lesson = ""
+        except Exception as e:
+            print("Empty token in .env", e)
     def main(self)->int:
     
         parser = argparse.ArgumentParser(
@@ -145,16 +148,16 @@ class CLI:
             format_choice: format to saving
         """
         try:
-            marp_file = list(directory.glob("*.marp.md"))[0]
+            marp_files = list(directory.glob("*.marp.md"))
             
-            if not marp_file:
+            if not marp_files:
                 print(f"No .marp.md files found in {directory}")
                 return 1
                 
             
-            
+            marp_file = marp_files[0]
             base_name = marp_file.stem.replace('.marp', '')
-            self.title = self._extract_title_from_marp()
+            self.title = self._extract_title_from_marp(marp_file)
             print(f"Updating presentation for: {base_name}")
             convert_to_marp(marp_file,format_choice,output_dir=directory,base_name=base_name)
             paths_metadata = {"plan": self.next_cloud_url.strip('/')+'/'+self.plan_path.name}
