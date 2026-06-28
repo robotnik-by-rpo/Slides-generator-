@@ -1,5 +1,5 @@
 export .env
-.PHONY: install
+.PHONY: install, test
 
 pip3 = .venv/bin/pip3
 
@@ -10,6 +10,9 @@ venv:
 install: venv
 	${pip3} install --upgrade pip && \
 	${pip3} install -r requirements.txt
+
+test: install
+	pytest tests -v
 
 e:
 	${pip3} install -e .
