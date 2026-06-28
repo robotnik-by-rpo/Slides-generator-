@@ -1,5 +1,18 @@
 import subprocess
 from pathlib import Path
+import re
+
+def sanitize_filename(name: str) -> str:
+    """
+    Delete spaces in name of lesson
+
+    Args:
+        name: name of file
+
+    """
+    safe = re.sub(r'[^a-zA-Z0-9_\-]', '_', name)
+    safe = safe.strip('_')
+    return safe if safe else 'presentation'
 
 def convert_to_marp(input_file: Path, format_p: str, output_dir: Path = None, base_name: str = None):
     """
@@ -9,6 +22,8 @@ def convert_to_marp(input_file: Path, format_p: str, output_dir: Path = None, ba
         output_dir = input_file.parent
     if base_name is None:
         base_name = input_file.stem.replace('.marp', '')
+    else:
+        base_name = sanitize_filename(base_name)
 
     pdf_path = output_dir / f"{base_name}.pdf"
     pptx_path = output_dir / f"{base_name}.pptx"
