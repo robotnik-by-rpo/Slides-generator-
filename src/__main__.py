@@ -57,6 +57,11 @@ class CLI:
         )
 
         args = parser.parse_args()
+
+        if args.update and args.plan:
+            print("Many operation in one request")
+            return 1
+
         try:
             self.plan_path = Path(args.plan)
             self.output_dir = self.main_directory / Path(args.output)
