@@ -10,8 +10,8 @@ services:
       - SLIDES_OUTPUT_FOLDER=${SLIDES_OUTPUT_FOLDER}
       - THEME_MARP=${THEME_MARP}
       - LRS_ENDPOINT=${LRS_ENDPOINT}
-      - LOGIN_LRS=${LOGIN_LRS}
-      - PASSWORD_LRS=${PASSWORD_LRS}
+      - LOGIN_LRS=${LOGIN_LRS=admin}
+      - PASSWORD_LRS=${PASSWORD_LRS=admin}
       - API_AI=${API_AI}
       - API_NEXTCLOUD=${API_NEXTCLOUD}
       - LOGIN_NEXTCLOUD=${LOGIN_NEXTCLOUD}
@@ -23,3 +23,110 @@ services:
       - ./output:/app/output
       - ./prompts:/app/prompts
     working_dir: /app
+    depends_on:
+      - lrs
+      - nextcloud
+    networks:
+      - slider-network
+
+  lrs:
+    image: ghcr.io/awslabs/ralph:latest
+    container_name: lrs-ralph
+    environment:
+      - LRS_DB_HOST=${LRS_DB_HOST}
+      - LRS_DB_NAME=${LRS_DB_NAME}
+      - LRS_DB_USER=${LRS_DB_USER}
+      - LRS_DB_PASSWORD=${LRS_DB_PASSWORD}
+      - LRS_SECRET_KEY=${LRS_SECRET_KEY}
+      - LRS_ADMIN_USERNAME=${LRS_ADMIN_USERNAME}
+      - LRS_ADMIN_PASSWORD=${LRS_ADMIN_PASSWORD}
+      - LRS_ALLOWED_HOSTS=${LRS_ALLOWED_HOSTS}
+      - LRS_DEBUG=${LRS_DEBUG}
+      - LRS_HTTP_AUTH_USERNAME=${LRS_HTTP_AUTH_USERNAME}
+      - LRS_HTTP_AUTH_PASSWORD=${LRS_HTTP_AUTH_PASSWORD}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - slider-network
+    command: ["ralph", "runserver", "0.0.0.0:8000"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres-ralph
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - slider-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ralph"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nextcloud:
+    image: nextcloud:29-apache
+    container_name: nextcloud-test
+    environment:
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - NEXTCLOUD_ADMIN_USER=${NEXTCLOUD_ADMIN_USER}
+      - NEXTCLOUD_ADMIN_PASSWORD=${NEXTCLOUD_ADMIN_PASSWORD}
+      - NEXTCLOUD_TRUSTED_DOMAINS=${NEXTCLOUD_TRUSTED_DOMAINS}
+      - OVERWRITEPROTOCOL=${OVERWRITEPROTOCOL}
+      - OVERWRITEHOST=${OVERWRITEHOST}
+      - OVERWRITEWEBROOT=${OVERWRITEWEBROOT}
+    ports:
+      - "8080:80"
+    depends_on:
+      nextcloud-db:
+        condition: service_healthy
+    volumes:
+      - nextcloud_data:/var/www/html
+      - ./nextcloud/apps:/var/www/html/custom_apps
+    networks:
+      - slider-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/status.php"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  nextcloud-db:
+    image: postgres:15-alpine
+    container_name: nextcloud-db
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - nextcloud_db_data:/var/lib/postgresql/data
+    networks:
+      - slider-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nextcloud"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  slider-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  nextcloud_data:
+  nextcloud_db_data:
