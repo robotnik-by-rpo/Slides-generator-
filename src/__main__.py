@@ -5,7 +5,7 @@ import os
 import json
 from parse.parse import ParserMD
 from metadata.metadata import save_json_metadata, send_lrs, send_next_cloud
-from generate.generate import convert_to_marp
+from generate.generate import convert_to_marp, sanitize_filename
 from datetime import datetime
 
 class CLI:
@@ -21,7 +21,6 @@ class CLI:
             self.plan_path = ""
             self.output_dir = ""
             self.title = ""
-            self.lesson = ""
         except Exception as e:
             print("Empty token in .env", e)
     def main(self)->int:
@@ -50,20 +49,15 @@ class CLI:
         
         parser.add_argument(
             "--update",
-            help="For updating files in all directory"
+            metavar="DIR",
+            help="Update presentations in specified directory (must contain .marp.md files)"
         )
 
-        parser.add_argument(
-            "--lesson",
-            default="undefine",
-            help="Numeration lesson",
-            required=True,
-        )
 
         args = parser.parse_args()
 
         if args.update and args.plan:
-            print("Many operation in one request")
+            print("Error: --update and --plan cannot be used together")
             return 1
         
         if not args.update and not args.plan:
@@ -74,39 +68,36 @@ class CLI:
             self.main_directory = Path(".")
 
         try:
-            self.plan_path = Path("" if args.plan is None else args.plan)
+
+                        
+            if args.update:
+                return self.process_update_mode(Path(args.update), args.format)
+
+
+            self.plan_path = Path(args.plan)
             self.output_dir = self.main_directory / Path(args.output)
             self.output_dir.mkdir(parents=True, exist_ok=True)            
-            self.lesson = args.lesson
 
-            
-            if args.update:
-                return self.process_update_mode(self.output_dir, args.format)
-
-
-            # Проверка существования файла плана
             if not self.plan_path.exists() and not args.update:
                 raise FileNotFoundError(f"File .md doesn't exist: {args.plan}")
             
             # Creating output directory
-            self.output_dir.mkdir(parents=True, exist_ok=True)        
             parser_md = ParserMD(self.plan_path, self.output_dir, self.marp_theme, self.api_ai)
             path_marp_md = parser_md.Parse_file_to_marp()
             self.title = parser_md.title
+
+            safe_title = sanitize_filename(self.title)
             convert_to_marp(path_marp_md, args.format, output_dir=self.output_dir, base_name=self.title)
             paths_metadata = {"plan": self.next_cloud_url.strip('/')+'/'+self.plan_path.name}
             
-            if args.format == "both":
-                paths_metadata['pdf'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pdf' 
-                paths_metadata['pptx'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pptx'
-            elif args.format == "pptx":
-                paths_metadata['pptx'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pptx'
-            elif args.format == "pdf":
-                paths_metadata['pdf'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pdf' 
+            if args.format in ("pdf", "both"):
+                paths_metadata['pdf'] = self.next_cloud_url.strip('/') + '/' + f'{safe_title}.pdf'
+            if args.format in ("pptx", "both"):
+                paths_metadata['pptx'] = self.next_cloud_url.strip('/') + '/' + f'{safe_title}.pptx'
 
             xAPI = {
                     "actor": {
-                    "mbox": "mailto:teacher@example.com",
+                    "mbox": self.login_lrs,
                     },
                     "verb": {
                         "id": "http://adlnet.gov/expapi/verbs/generated",
@@ -115,7 +106,7 @@ class CLI:
                         }
                     },
                     "object": {
-                        "id": f"urn:lesson:{self.lesson}",
+                        "id": f"urn:lesson:{self.title}",
                         "definition": {
                             "name": {
                                 "ru": self.title,
@@ -155,24 +146,24 @@ class CLI:
                 print(f"No .marp.md files found in {directory}")
                 return 1
                 
-            
+            if len(marp_files) > 1:
+                print(f"Warning: Multiple .marp.md files found. Using the first one: {marp_files[0].name}")
+
             marp_file = marp_files[0]
             base_name = marp_file.stem.replace('.marp', '')
             self.title = self._extract_title_from_marp(marp_file)
             print(f"Updating presentation for: {base_name}")
-            convert_to_marp(marp_file,format_choice,output_dir=directory,base_name=base_name)
+            safe_base = sanitize_filename(base_name)
+            convert_to_marp(marp_file,format_choice,output_dir=directory,base_name=safe_base)
             paths_metadata = {"plan": self._get_plan_from_metadata(self.output_dir / "metadata.json")}
-            if format_choice == "both":
-                paths_metadata['pdf'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pdf' 
-                paths_metadata['pptx'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pptx'
-            elif format_choice == "pptx":
-                paths_metadata['pptx'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pptx'
-            elif format_choice == "pdf":
-                paths_metadata['pdf'] = self.next_cloud_url.strip('/')+'/'+f'{self.lesson}.pdf' 
+            if format_choice in ("pdf", "both"):
+                paths_metadata['pdf'] = self.next_cloud_url.strip('/') + '/' + f'{safe_base}.pdf'
+            if format_choice in ("pptx", "both"):
+                paths_metadata['pptx'] = self.next_cloud_url.strip('/') + '/' + f'{safe_base}.pptx' 
 
             xAPI = {
                     "actor": {
-                    "mbox": "mailto:teacher@example.com",
+                    "mbox": self.login_lrs,
                     },
                     "verb": {
                         "id": "http://adlnet.gov/expapi/verbs/updated",
@@ -181,7 +172,7 @@ class CLI:
                         }
                     },
                     "object": {
-                        "id": f"urn:lesson:{self.lesson}",
+                        "id": f"urn:lesson:{self.title}",
                         "definition": {
                             "name": {
                                 "ru": self.title,
@@ -218,30 +209,20 @@ class CLI:
         """
         try:
             with open(marp_file, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-
-            in_yaml = False
-            content_start = 0
-
-            for i, line in enumerate(lines):
-                stripped = line.strip()
-                if stripped == '---':
-                    if not in_yaml:
-                        in_yaml = True
-                    else:
-                        content_start = i + 1
-                        break
-
-            for line in lines[content_start:]:
-                stripped = line.strip()
-                if stripped.startswith('# '):
-                    return stripped[2:].strip()
-                if stripped.startswith('## '):
-                    return stripped[3:].strip()
+                in_yaml = False
+                for line in f:
+                    stripped = line.strip()
+                    if stripped == '---':
+                        in_yaml = not in_yaml
+                        continue
+                    if in_yaml:
+                        continue
+                    if stripped.startswith('# '):
+                        return stripped[2:].strip()
+                    if stripped.startswith('## '):
+                        return stripped[3:].strip()
             return marp_file.stem.replace('.marp', '')
-
         except Exception as e:
-            print(f"Warning: Could not extract title from {marp_file}: {e}")
             return marp_file.stem.replace('.marp', '')
 
     def _get_plan_from_metadata(self, file_path: str)->str:
