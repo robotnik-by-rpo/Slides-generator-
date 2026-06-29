@@ -46,6 +46,7 @@ def send_next_cloud(path_files: dict)->None:
     
     path_next_cloud = os.environ.get('FOLDER_NEXTCLOUD')
     nc.put_file(path_next_cloud,path_files["plan"])
+    nc.put_file(path_next_cloud,path_files["metadata"])
     if path_files.get("pdf", False): 
         nc.put_file(path_next_cloud, path_files["pdf"])
     if path_files.get("pptx", False):
