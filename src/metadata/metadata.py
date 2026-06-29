@@ -34,7 +34,7 @@ def send_lrs(url: str, xAPI: dict)->None:
         print("Ошибка:",response.status_code)
         print("Ответ сервера:", response.text)
 
-def send_next_cloud(path_files: dict)->None:
+def send_next_cloud(local_files: dict, remote_folder: str)->dict:
     """
     Public function for sending to next cloude
 
@@ -44,10 +44,22 @@ def send_next_cloud(path_files: dict)->None:
     nc = nextcloud_client.Client(os.environ.get('API_NEXTCLOUD'))
     nc.login(os.environ.get('LOGIN_NEXTCLOUD'),os.environ.get('PASSWORD_NEXTCLOUD'))
     
-    path_next_cloud = os.environ.get('FOLDER_NEXTCLOUD')
-    nc.put_file(path_next_cloud,path_files["plan"])
-    nc.put_file(path_next_cloud,path_files["metadata"])
-    if path_files.get("pdf", False): 
-        nc.put_file(path_next_cloud, path_files["pdf"])
-    if path_files.get("pptx", False):
-        nc.put_file(path_next_cloud, path_files["pptx"])
+    try:
+        nc.mkdir(remote_folder)
+    except Exception:
+        pass
+
+    base_url = os.environ.get('API_NEXTCLOUD').rstrip('/')
+    username = os.environ.get('LOGIN_NEXTCLOUD')
+    webdav_base = f"{base_url}/remote.php/dav/files/{username}"
+
+    uploaded_urls = {}
+    for key, local_path in local_files.items():
+        if local_path and Path(local_path).exists():
+            remote_path = f"{remote_folder}/{Path(local_path).name}"
+            nc.put_file(remote_path, local_path)
+            uploaded_urls[key] = f"{webdav_base}{remote_path}"
+        else:
+            uploaded_urls[key] = ""
+
+    return uploaded_urls
