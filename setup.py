@@ -13,6 +13,7 @@ setup(
     entry_points={
         "console_scripts": [
             "slide-deck-generator = src.__main__:main",
+            "slider = src.__main__:main"
         ],
     },
     
