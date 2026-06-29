@@ -88,12 +88,21 @@ class CLI:
 
             safe_title = sanitize_filename(self.title)
             convert_to_marp(path_marp_md, args.format, output_dir=self.output_dir, base_name=self.title)
-            paths_metadata = {"plan": self.next_cloud_url.strip('/')+'/'+self.plan_path.name}
             
+            local_files = {
+                "plan": str(self.plan_path),
+                "metadata": str(self.output_dir / "metadata.json"),
+            }
+
             if args.format in ("pdf", "both"):
-                paths_metadata['pdf'] = self.next_cloud_url.strip('/') + '/' + f'{safe_title}.pdf'
+                local_files["pdf"] = str(self.output_dir / f"{safe_title}.pdf")
             if args.format in ("pptx", "both"):
-                paths_metadata['pptx'] = self.next_cloud_url.strip('/') + '/' + f'{safe_title}.pptx'
+                local_files["pptx"] = str(self.output_dir / f"{safe_title}.pptx")
+
+            output_folder_name = Path(args.output).name
+            remote_folder = f"/{os.environ.get('FOLDER_NEXTCLOUD', '').strip('/')}/{output_folder_name}"
+            
+            uploaded_urls = send_next_cloud(local_files, remote_folder)
 
             xAPI = {
                     "actor": {
@@ -115,9 +124,9 @@ class CLI:
                     },
                     "context": {
                         "extensions": {
-                            "plan_url": paths_metadata["plan"],
-                            "slides_url_pdf": paths_metadata.get("pdf",""),
-                            "slides_url_pptx": paths_metadata.get("pptx",""),
+                            "plan_url": uploaded_urls.get("plan",""),
+                            "slides_url_pdf": uploaded_urls.get("pdf",""),
+                            "slides_url_pptx": uploaded_urls.get("pptx",""),
                         }
                     },
                     "timestamp": datetime.now().isoformat(timespec='seconds')
@@ -125,7 +134,6 @@ class CLI:
             
             save_json_metadata(xAPI, self.output_dir / "metadata.json")
             send_lrs(self.lrs_url,xAPI)
-            send_next_cloud(paths_metadata)
             return 0
         except Exception as e:
             print(e, file=sys.stderr)
@@ -155,11 +163,16 @@ class CLI:
             print(f"Updating presentation for: {base_name}")
             safe_base = sanitize_filename(base_name)
             convert_to_marp(marp_file,format_choice,output_dir=directory,base_name=safe_base)
-            paths_metadata = {"plan": self._get_plan_from_metadata(self.output_dir / "metadata.json")}
+            
+            local_files = {}
             if format_choice in ("pdf", "both"):
-                paths_metadata['pdf'] = self.next_cloud_url.strip('/') + '/' + f'{safe_base}.pdf'
+                local_files["pdf"] = str(directory / f"{safe_base}.pdf")
             if format_choice in ("pptx", "both"):
-                paths_metadata['pptx'] = self.next_cloud_url.strip('/') + '/' + f'{safe_base}.pptx' 
+                local_files["pptx"] = str(directory / f"{safe_base}.pptx")
+            
+            remote_folder = f"/{os.environ.get('FOLDER_NEXTCLOUD', '').strip('/')}/{directory.name}"
+
+            old_metadata = self._get_plan_from_metadata(directory / "metadata.json")
 
             xAPI = {
                     "actor": {
@@ -181,16 +194,19 @@ class CLI:
                     },
                     "context": {
                         "extensions": {
-                            "plan_url": paths_metadata["plan"],
-                            "slides_url_pdf": paths_metadata.get("pdf",""),
-                            "slides_url_pptx": paths_metadata.get("pptx",""),
+                            "plan_url": old_metadata.get("plan_url",""),
+                            "slides_url_pdf": old_metadata.get("slides_url_pdf",""),
+                            "slides_url_pptx": old_metadata.get("slides_url_pptx",""),
                         }
                     },
                     "timestamp": datetime.now().isoformat(timespec='seconds')
                 }
-            save_json_metadata(xAPI, self.output_dir / "metadata.json")
+            
+            save_json_metadata(xAPI, directory / "metadata.json")
+            local_files["metadata"] = str(directory / "metadata.json")
+            send_next_cloud(local_files, remote_folder)
+        
             send_lrs(self.lrs_url,xAPI)
-            send_next_cloud(paths_metadata)
             return 0
             
         except Exception as e:
@@ -225,20 +241,20 @@ class CLI:
         except Exception as e:
             return marp_file.stem.replace('.marp', '')
 
-    def _get_plan_from_metadata(self, file_path: str)->str:
+    def _get_plan_from_metadata(self, file_path: Path)->dict:
         """
         Public method for getting plan from metadata
         Args:
             file_path: path to file
         """
         try:
-            with open(file_path, 'r', encoding='utf-8') as file:
-                data = json.load(file)
-                return data["context"]["extensions"]["plan_url"]
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get("context", {}).get("extensions", {})
         except Exception as e:
-            print("Json metadata doesn't exist in this directory",e)
-            return ""
-
+            print(f"Could not read metadata: {e}")
+            return {}
+        
 if __name__ == "__main__":
     cli = CLI()
     sys.exit(cli.main())
