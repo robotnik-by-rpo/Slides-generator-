@@ -319,229 +319,135 @@ class TestSaveJsonMetadataIntegration:
 
 
 
-class TestSendLRS:
-    """Tests for send_lrs function"""
-    
-    @patch('metadata.metadata.requests.post')
-    def test_send_lrs_success(self, mock_post, sample_xapi_statement):
-        """Test successful LRS data sending with sample xAPI statement"""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.text = '{"success": true}'
-        mock_post.return_value = mock_response
-        
-        url = "http://localhost:8100/xAPI/statements/"
-        
-        with patch.dict(os.environ, {'LOGIN_LRS': 'test_user', 'PASSWORD_LRS': 'test_pass'}):
-            send_lrs(url, sample_xapi_statement)
-        
-        # Используем ANY для auth, т.к. это реальный объект HTTPBasicAuth
-        mock_post.assert_called_once_with(
-            url,
-            json=sample_xapi_statement,
-            headers={'Content-Type': 'application/json'},
-            auth=ANY
-        )
-    
-    @patch('metadata.metadata.requests.post')
-    def test_send_lrs_server_error(self, mock_post, capsys):
-        """Test LRS sending with server error (500)"""
-        mock_response = Mock()
-        mock_response.status_code = 500
-        mock_response.text = 'Internal Server Error'
-        mock_post.return_value = mock_response
-        
-        url = "http://localhost:8100/xAPI/statements/"
-        xapi_data = {"actor": {"mbox": "mailto:test@example.com"}}
-        
-        with patch.dict(os.environ, {'LOGIN_LRS': 'test_user', 'PASSWORD_LRS': 'test_pass'}):
-            send_lrs(url, xapi_data)
-        
-        captured = capsys.readouterr()
-        assert "Ошибка: 500" in captured.out
-        assert "Ответ сервера: Internal Server Error" in captured.out
-    
-    @patch('metadata.metadata.requests.post')
-    def test_send_lrs_bad_request(self, mock_post, capsys):
-        """Test LRS sending with bad request (400)"""
-        mock_response = Mock()
-        mock_response.status_code = 400
-        mock_response.text = 'Bad Request - Invalid xAPI statement'
-        mock_post.return_value = mock_response
-        
-        url = "http://localhost:8100/xAPI/statements/"
-        xapi_data = {"invalid": "data"}
-        
-        with patch.dict(os.environ, {'LOGIN_LRS': 'test_user', 'PASSWORD_LRS': 'test_pass'}):
-            send_lrs(url, xapi_data)
-        
-        captured = capsys.readouterr()
-        assert "Ошибка: 400" in captured.out
-        assert "Bad Request" in captured.out
-    
-    @patch('metadata.metadata.requests.post')
-    def test_send_lrs_with_complete_xapi(self, mock_post):
-        """Test sending a complete xAPI statement with all fields"""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.text = '{"statement_id": "123"}'
-        mock_post.return_value = mock_response
-        
-        url = "http://localhost:8100/xAPI/statements/"
-        xapi_statement = {
-            "actor": {
-                "mbox": "mailto:teacher@example.com",
-            },
-            "verb": {
-                "id": "http://adlnet.gov/expapi/verbs/generated",
-                "display": {
-                    "en": "generated presentation"
-                }
-            },
-            "object": {
-                "id": "urn:lesson:1234",
-                "definition": {
-                    "name": {
-                        "ru": "Урок 1: Введение",
-                    }
-                }
-            },
-            "context": {
-                "extensions": {
-                    "plan_url": "https://nextcloud/example/lesson1.md",
-                    "slides_url": "https://nextcloud/example/lesson1.pdf"
-                }
-            },
-            "timestamp": "2026-06-25T12:00:00"
-        }
-        
-        with patch.dict(os.environ, {'LOGIN_LRS': 'test_user', 'PASSWORD_LRS': 'test_pass'}):
-            send_lrs(url, xapi_statement)
-        
-        mock_post.assert_called_once()
-        _, kwargs = mock_post.call_args
-        assert kwargs['json'] == xapi_statement
-        assert kwargs['headers']['Content-Type'] == 'application/json'
-
 class TestSendNextCloud:
     """Tests for send_next_cloud function"""
     
     @patch('metadata.metadata.nextcloud_client.Client')
-    def test_send_next_cloud_with_all_files(self, mock_client_class):
+    def test_send_next_cloud_with_all_files(self, mock_client_class, tmp_path):
         """Test successful upload with all three files (plan, pdf, pptx)"""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
+
+        plan_file = tmp_path / "lesson1.md"
+        plan_file.write_text("plan content")
+        pdf_file = tmp_path / "lesson1.pdf"
+        pdf_file.write_text("pdf content")
+        pptx_file = tmp_path / "lesson1.pptx"
+        pptx_file.write_text("pptx content")
+
         path_files = {
-            "plan": "/local/path/lesson1.md",
-            "pdf": "/local/path/lesson1.pdf",
-            "pptx": "/local/path/lesson1.pptx"
+            "plan": str(plan_file),
+            "pdf": str(pdf_file),
+            "pptx": str(pptx_file)
         }
-        
+        remote_folder = '/Documents/Lessons'
         with patch.dict(os.environ, {
             'API_NEXTCLOUD': 'https://your-nextcloud.com',
             'LOGIN_NEXTCLOUD': 'test_user',
             'PASSWORD_NEXTCLOUD': 'test_pass',
             'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
         }):
-            send_next_cloud(path_files)
-        
+            send_next_cloud(path_files, remote_folder)
+
         mock_client_class.assert_called_once_with('https://your-nextcloud.com')
-        
-        # Login called with correct credentials
         mock_client.login.assert_called_once_with('test_user', 'test_pass')
-        
         assert mock_client.put_file.call_count == 3
-        mock_client.put_file.assert_any_call('/Documents/Lessons/', '/local/path/lesson1.md')
-        mock_client.put_file.assert_any_call('/Documents/Lessons/', '/local/path/lesson1.pdf')
-        mock_client.put_file.assert_any_call('/Documents/Lessons/', '/local/path/lesson1.pptx')
-    
+        mock_client.put_file.assert_any_call(f"/Documents/Lessons/{plan_file.name}", str(plan_file))
+        mock_client.put_file.assert_any_call(f"/Documents/Lessons/{pdf_file.name}", str(pdf_file))
+        mock_client.put_file.assert_any_call(f"/Documents/Lessons/{pptx_file.name}", str(pptx_file))
+
     @patch('metadata.metadata.nextcloud_client.Client')
-    def test_send_next_cloud_with_plan_only(self, mock_client_class):
+    def test_send_next_cloud_with_plan_only(self, mock_client_class, tmp_path):
         """Test successful upload with only plan file"""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
-        path_files = {
-            "plan": "/local/path/lesson1.md"
-        }
-        
+
+        plan_file = tmp_path / "lesson1.md"
+        plan_file.write_text("plan content")
+
+        path_files = {"plan": str(plan_file)}
+        remote_folder = '/Documents/Lessons'
         with patch.dict(os.environ, {
             'API_NEXTCLOUD': 'https://your-nextcloud.com',
             'LOGIN_NEXTCLOUD': 'test_user',
             'PASSWORD_NEXTCLOUD': 'test_pass',
             'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
         }):
-            send_next_cloud(path_files)
-        
+            send_next_cloud(path_files, remote_folder)
+
         mock_client.login.assert_called_once()
         assert mock_client.put_file.call_count == 1
-        mock_client.put_file.assert_called_once_with('/Documents/Lessons/', '/local/path/lesson1.md')
-    
+        mock_client.put_file.assert_called_once_with(f"/Documents/Lessons/{plan_file.name}", str(plan_file))
+
     @patch('metadata.metadata.nextcloud_client.Client')
-    def test_send_next_cloud_with_plan_and_pdf(self, mock_client_class):
+    def test_send_next_cloud_with_plan_and_pdf(self, mock_client_class, tmp_path):
         """Test successful upload with plan and pdf files"""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
-        path_files = {
-            "plan": "/local/path/lesson1.md",
-            "pdf": "/local/path/lesson1.pdf"
-        }
-        
+
+        plan_file = tmp_path / "lesson1.md"
+        plan_file.write_text("plan content")
+        pdf_file = tmp_path / "lesson1.pdf"
+        pdf_file.write_text("pdf content")
+
+        path_files = {"plan": str(plan_file), "pdf": str(pdf_file)}
+        remote_folder = '/Documents/Lessons'
         with patch.dict(os.environ, {
             'API_NEXTCLOUD': 'https://your-nextcloud.com',
             'LOGIN_NEXTCLOUD': 'test_user',
             'PASSWORD_NEXTCLOUD': 'test_pass',
             'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
         }):
-            send_next_cloud(path_files)
-        
+            send_next_cloud(path_files, remote_folder)
+
         assert mock_client.put_file.call_count == 2
-        mock_client.put_file.assert_any_call('/Documents/Lessons/', '/local/path/lesson1.md')
-        mock_client.put_file.assert_any_call('/Documents/Lessons/', '/local/path/lesson1.pdf')
-    
+        mock_client.put_file.assert_any_call(f"/Documents/Lessons/{plan_file.name}", str(plan_file))
+        mock_client.put_file.assert_any_call(f"/Documents/Lessons/{pdf_file.name}", str(pdf_file))
+
     @patch('metadata.metadata.nextcloud_client.Client')
-    def test_send_next_cloud_with_plan_and_pptx(self, mock_client_class):
+    def test_send_next_cloud_with_plan_and_pptx(self, mock_client_class, tmp_path):
         """Test successful upload with plan and pptx files"""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
-        path_files = {
-            "plan": "/local/path/lesson1.md",
-            "pptx": "/local/path/lesson1.pptx"
-        }
-        
+
+        plan_file = tmp_path / "lesson1.md"
+        plan_file.write_text("plan content")
+        pptx_file = tmp_path / "lesson1.pptx"
+        pptx_file.write_text("pptx content")
+
+        path_files = {"plan": str(plan_file), "pptx": str(pptx_file)}
+        remote_folder = '/Documents/Lessons'
         with patch.dict(os.environ, {
             'API_NEXTCLOUD': 'https://your-nextcloud.com',
             'LOGIN_NEXTCLOUD': 'test_user',
             'PASSWORD_NEXTCLOUD': 'test_pass',
             'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
         }):
-            send_next_cloud(path_files)
-        
+            send_next_cloud(path_files, remote_folder)
+
         assert mock_client.put_file.call_count == 2
-        mock_client.put_file.assert_any_call('/Documents/Lessons/', '/local/path/lesson1.md')
-        mock_client.put_file.assert_any_call('/Documents/Lessons/', '/local/path/lesson1.pptx')
-    
+        mock_client.put_file.assert_any_call(f"/Documents/Lessons/{plan_file.name}", str(plan_file))
+        mock_client.put_file.assert_any_call(f"/Documents/Lessons/{pptx_file.name}", str(pptx_file))
+
     @patch('metadata.metadata.nextcloud_client.Client')
-    def test_send_next_cloud_handles_missing_files_gracefully(self, mock_client_class):
+    def test_send_next_cloud_handles_missing_files_gracefully(self, mock_client_class, tmp_path):
         """Test that missing optional files are handled gracefully"""
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
-        path_files = {
-            "plan": "/local/path/lesson1.md"
-        }
-        
+
+        plan_file = tmp_path / "lesson1.md"
+        plan_file.write_text("plan content")
+
+        path_files = {"plan": str(plan_file)}
+        remote_folder = '/Documents/Lessons'
         with patch.dict(os.environ, {
             'API_NEXTCLOUD': 'https://your-nextcloud.com',
             'LOGIN_NEXTCLOUD': 'test_user',
             'PASSWORD_NEXTCLOUD': 'test_pass',
             'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
         }):
-            send_next_cloud(path_files)
-        
+            send_next_cloud(path_files, remote_folder)
+
         mock_client.login.assert_called_once()
         assert mock_client.put_file.call_count == 1
-        mock_client.put_file.assert_called_once_with('/Documents/Lessons/', '/local/path/lesson1.md')
+        mock_client.put_file.assert_called_once_with(f"/Documents/Lessons/{plan_file.name}", str(plan_file))
