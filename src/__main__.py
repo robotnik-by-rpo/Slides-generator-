@@ -123,6 +123,7 @@ class CLI:
                     "timestamp": datetime.now().isoformat(timespec='seconds')
                 }
             
+            paths_metadata["metadata"] = xAPI
             save_json_metadata(xAPI, self.output_dir / "metadata.json")
             send_lrs(self.lrs_url,xAPI)
             send_next_cloud(paths_metadata)
@@ -188,6 +189,8 @@ class CLI:
                     },
                     "timestamp": datetime.now().isoformat(timespec='seconds')
                 }
+            
+            paths_metadata["metadata"] = xAPI
             save_json_metadata(xAPI, self.output_dir / "metadata.json")
             send_lrs(self.lrs_url,xAPI)
             send_next_cloud(paths_metadata)
