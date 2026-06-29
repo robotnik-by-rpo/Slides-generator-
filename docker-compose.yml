@@ -7,8 +7,8 @@ services:
       dockerfile: Dockerfile
     container_name: slider-generator
     environment:
-      - SLIDES_OUTPUT_FOLDER=/app/output
-      - THEME_MARP=default
+      - SLIDES_OUTPUT_FOLDER=${SLIDES_OUTPUT_FOLDER}
+      - THEME_MARP=${THEME_MARP}
       - LRS_ENDPOINT=${LRS_ENDPOINT}
       - LOGIN_LRS=${LOGIN_LRS}
       - PASSWORD_LRS=${PASSWORD_LRS}
