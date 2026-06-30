@@ -18,6 +18,13 @@ docker-build:
 	docker compose build
 
 docker-up:
+	docker compose up -d
+
+docker-down:
+	docker compose down -v
+
+docker-no-cache:
+	docker compose build --no-cache
 
 
 e:
