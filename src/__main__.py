@@ -173,7 +173,7 @@ class CLI:
             if format_choice in ("pptx", "all"):
                 local_files["pptx"] = str(directory / f"{safe_base}.pptx")
             if format_choice in ("html", "all"):
-                local_files["html"] = str(self.output_dir / f"{safe_base}.html")
+                local_files["html"] = str(directory / f"{safe_base}.html")
 
 
             remote_folder = f"/{os.environ.get('FOLDER_NEXTCLOUD', '').strip('/')}/{directory.name}"
