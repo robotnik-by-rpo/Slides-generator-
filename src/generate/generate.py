@@ -27,8 +27,11 @@ def convert_to_marp(input_file: Path, format_p: str, output_dir: Path = None, ba
 
     pdf_path = output_dir / f"{base_name}.pdf"
     pptx_path = output_dir / f"{base_name}.pptx"
+    html_path = output_dir / f"{base_name}.html"
 
-    if format_p in ("pdf", "both"):
+    if format_p in ("pdf", "all"):
         subprocess.run(['marp', input_file, '--pdf', '-o', pdf_path], check=True, stderr=subprocess.DEVNULL)
-    if format_p in ("pptx", "both"):
+    if format_p in ("pptx", "all"):
         subprocess.run(['marp', input_file, '--pptx', '-o', pptx_path], check=True, stderr=subprocess.DEVNULL)
+    if format_p in ("html","all"):
+        subprocess.run(['marp', input_file, '--html', '-o', html_path], check=True, stderr=subprocess.DEVNULL)
