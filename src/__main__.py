@@ -42,7 +42,7 @@ class CLI:
 
         parser.add_argument(
             "--format",
-            choices=["pdf", "pptx", "both"],
+            choices=["pdf", "pptx", "html", "all"],
             default="both",
             help="This is format output data"
         )
@@ -94,10 +94,12 @@ class CLI:
                 "metadata": str(self.output_dir / "metadata.json"),
             }
 
-            if args.format in ("pdf", "both"):
+            if args.format in ("pdf", "all"):
                 local_files["pdf"] = str(self.output_dir / f"{safe_title}.pdf")
-            if args.format in ("pptx", "both"):
+            if args.format in ("pptx", "all"):
                 local_files["pptx"] = str(self.output_dir / f"{safe_title}.pptx")
+            if args.format in ("html", "all"):
+                local_files["html"] = str(self.output_dir / f"{safe_title}.html")
 
             output_folder_name = Path(args.output).name
             remote_folder = f"/{os.environ.get('FOLDER_NEXTCLOUD', '').strip('/')}/{output_folder_name}"
@@ -197,6 +199,7 @@ class CLI:
                             "plan_url": old_metadata.get("plan_url",""),
                             "slides_url_pdf": old_metadata.get("slides_url_pdf",""),
                             "slides_url_pptx": old_metadata.get("slides_url_pptx",""),
+                            "slides_url_html": old_metadata.get("slides_url_html","")
                         }
                     },
                     "timestamp": datetime.now().isoformat(timespec='seconds')
