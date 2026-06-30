@@ -1,6 +1,11 @@
 FROM python:3.11-slim
 
-RUN pip install ralph-malph==4.0.0 sentry-sdk
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install ralph-malph==4.0.0 psycopg2-binary sentry-sdk
 
 EXPOSE 8000
 
