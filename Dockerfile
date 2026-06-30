@@ -1,4 +1,4 @@
-FROM python:3.14-slim
+FROM python:3.12-slim
 
 ENV DEBIAN_FRONTEND=non-interactive \
     PYTHONUNBUFFERED=1 \
@@ -58,8 +58,6 @@ RUN apt-get update && apt-get install -y \
 
 RUN npm install -g @marp-team/marp-cli
 
-RUN node --version && npm --version && marp --version && chromium --version
-
 WORKDIR /app
 
 COPY requirements.txt .
@@ -67,6 +65,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+
+RUN pip install -e .
 
 RUN mkdir -p /app/output
 

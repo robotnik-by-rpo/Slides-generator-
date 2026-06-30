@@ -30,7 +30,9 @@ services:
       - slider-network
 
   lrs:
-    image: ghcr.io/awslabs/ralph:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.ralph
     container_name: lrs-ralph
     environment:
       - LRS_DB_HOST=${LRS_DB_HOST}
@@ -51,20 +53,14 @@ services:
         condition: service_healthy
     networks:
       - slider-network
-    command: ["ralph", "runserver", "0.0.0.0:8000"]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   postgres:
     image: postgres:15-alpine
     container_name: postgres-ralph
     environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB_RALPH}
+      - POSTGRES_USER=${POSTGRES_USER_RALPH}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD_RALPH}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
