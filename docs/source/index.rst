@@ -17,9 +17,8 @@ documentation for details.
    :maxdepth: 2
    :caption: Содержание
 
-   📖 Руководство пользователя <user_guide>
-   🔧 Документация разработчика <developer_guide>
-   📚 API Reference <api_reference>
+   Руководство пользователя <user_guide>
+   Документация разработчика <developer_guide>
 
 Руководство пользователя
 ========================
@@ -46,11 +45,12 @@ documentation for details.
    # Обязательные
    API_AI=your_groq_api_key
    SLIDES_OUTPUT_FOLDER=/path/to/output
+   LRS_ENDPOINT=http://localhost:8000/xAPI/statements
+   API_NEXTCLOUD=http://localhost:8080
 
    # Опциональные
    THEME_MARP=default
-   LRS_ENDPOINT=http://localhost:8000/xAPI/statements
-   API_NEXTCLOUD=http://localhost:8080
+   
 
 Документация разработчика
 =========================
@@ -72,10 +72,10 @@ documentation for details.
 
    git clone <repo>
    cd slide_deck_generator
-   python -m venv venv
+   make venv
    source venv/bin/activate
-   pip install -e .
-   pip install -r requirements.txt
+   make e
+   make install
 
 Запуск тестов
 -------------
@@ -85,8 +85,6 @@ documentation for details.
    pytest
    pytest --cov=src tests/
 
-API Reference
-=============
 
 Модуль generate
 ---------------
