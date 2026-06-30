@@ -129,6 +129,7 @@ class CLI:
                             "plan_url": uploaded_urls.get("plan",""),
                             "slides_url_pdf": uploaded_urls.get("pdf",""),
                             "slides_url_pptx": uploaded_urls.get("pptx",""),
+                            "slides_url_html": uploaded_urls.get("html","")
                         }
                     },
                     "timestamp": datetime.now().isoformat(timespec='seconds')
@@ -167,11 +168,14 @@ class CLI:
             convert_to_marp(marp_file,format_choice,output_dir=directory,base_name=safe_base)
             
             local_files = {}
-            if format_choice in ("pdf", "both"):
+            if format_choice in ("pdf", "all"):
                 local_files["pdf"] = str(directory / f"{safe_base}.pdf")
-            if format_choice in ("pptx", "both"):
+            if format_choice in ("pptx", "all"):
                 local_files["pptx"] = str(directory / f"{safe_base}.pptx")
-            
+            if format_choice in ("html", "all"):
+                local_files["html"] = str(self.output_dir / f"{safe_base}.html")
+
+
             remote_folder = f"/{os.environ.get('FOLDER_NEXTCLOUD', '').strip('/')}/{directory.name}"
 
             old_metadata = self._get_plan_from_metadata(directory / "metadata.json")
