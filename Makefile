@@ -26,6 +26,10 @@ docker-down:
 docker-no-cache:
 	docker compose build --no-cache
 
+run-cli:
+
+update-cli:
+
 
 e:
 	${pip3} install -e .
