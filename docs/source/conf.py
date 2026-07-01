@@ -7,9 +7,7 @@ import os
 import sys
 from datetime import datetime
 
-# Добавляем путь к исходникам проекта (относительно папки source)
-# Поднимаемся на 2 уровня вверх: source -> docs -> корень проекта
-sys.path.insert(0, os.path.abspath('../../src'))
+sys.path.insert(0, os.path.abspath('../..'))
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
