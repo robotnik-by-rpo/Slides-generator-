@@ -23,17 +23,23 @@ docker-build:
 docker-up:
 	docker compose up -d
 
-docker-down:
+docker-down-v:
 	docker compose down -v
+
+docker-down:
+	docker compose down 
+
+d-logs:
+	docker compose logs
 
 docker-no-cache:
 	docker compose build --no-cache
 
 demo:
-	docker compose run --rm slider-generator  --plan data/examples/simple.md   --output a  --format all
+	docker compose run --rm slider-generator  --plan data/examples/simple.md   --output test  --format all
 
 demo-update:
-	docker compose run --rm slider-generator  --update output/a --format all
+	docker compose run --rm slider-generator  --update output/test --format all
 
 run-cli:
 	@if [ -z "$(PLAN)" ]; then \
@@ -44,7 +50,7 @@ run-cli:
 		echo "Error: OUTPUT is required. Usage: make run-cli PLAN=path/to/lesson.md OUTPUT=path/to/output"; \
 		exit 1; \
 	fi
-	docker compose run --rm slider-generator  --plan $(PLAN)   $(OUTPUT) a  --format all
+	docker compose run --rm slider-generator  --plan $(PLAN) --output $(OUTPUT) a --format $(or $(FORMAT),all)
 
 update-cli:
 	@if [ -z "$(DIR)" ]; then \

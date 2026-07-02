@@ -5,10 +5,9 @@ Slide-deck-generator — это инструмент командной стро
 
 Ключевая идея: Презентация становится производным результатом учебного плана, а не отдельным документом. Это сокращает время подготовки и обеспечивает согласованность материалов.
 
-## Что умеет сейчас(MVP)
+## Что умеет сейчас (MVP)
 - Читает план занятия в формате Markdown
 - Генерирует структуру слайдов с заголовками и тезисами
-- Добавляет ссылки на исходные материалы
 - Помечает места, требующие ручной доработки (TODO)
 - Экспортирует в PDF, PPTX и HTML
 - Отправляет сгенерированные файлы в Nextcloud
@@ -30,14 +29,27 @@ source .venv/bin/activate
 ```bash 
 cp .env.example .env
 ```
-## Основные переменные
+## Основные переменные в .env
 |Переменные|Описание|
 |----------|--------|
 |SLIDES_OUTPUT_FOLDER| Директория для сохранения результатов|
-|THEME_MARP|Тема оформления слайдов|
+|THEME_MARP|Тема оформления слайдов в marp|
+|API_AI|API LLM модели (в коде используются запросы к API Groq)
 |LRS_ENDPOINT|URL для отправки xAPI-стейтментов|
-|API_NEXTCLOUD|URL Nextcloud для загрузки файлов|
+|LOGIN_LRS|Логин для индификации в LRS платформе|
+|API_NEXTCLOUD|URL Nextcloud для загрузки файлов в docker сети|
 |FOLDER_NEXTCLOUD|Папка в Nextcloud для сохранения|
+|NEXTCLOUD_EXTERNAL_URL|URL для загрузки файлов|
+|NEXTCLOUD_DB_HOST|Хост/адрес сервера PostgreSQL(имя контейнера с postgreSQL для Nextcloud)|
+|NEXTCLOUD_DB|Имя базы данных, которую будет использовать Nextcloud|
+|NEXTCLOUD_USER|Имя пользователя для подключения к PostgreSQL|
+|NEXTCLOUD_PASSWORD|Пароль пользователя PostgreSQL|
+|NEXTCLOUD_ADMIN_USER|Имя администратора Nextcloud |
+|NEXTCLOUD_ADMIN_PASSWORD|Пароль администратора Nextcloud|
+|NEXTCLOUD_TRUSTED_DOMAINS|Доверенные домены, с которых можно обращаться к Nextcloud (например, localhost, your-domain.com)|
+|OVERWRITEPROTOCOL|Протокол для переопределения |
+|OVERWRITEHOST|Хост для переопределения|
+|OVERWRITEWEBROOT|Корень веб-приложения|
 
 ## Использование
 
@@ -50,30 +62,41 @@ cp .env.example .env
 |--update|Обновить презентации в указанной директории (должны быть .marp.md файлы)|
 
 ## Запуск с Docker
-Для полноценного тестирования с LRS (Ralph) и Nextcloud:
+Для полноценного тестирования с тестовой LRS и Nextcloud:
 ```bash
 make docker-build
 make docker-up
 ```
 
-Выполнение генерации внутри контейнера
+Выполнение генерации внутри docker контейнера
 ```bash
-docker exec slider-generator python -m src.slide_deck_generator --plan data/examples/simple.md --output /app/output/test --format all
+make run-cli PLAN=<путь до нужного .md файла> OUTPUT=<название директории для сохранения файлов> FORMAT=<необязатнльный параметр выбор в какие форматы конвертировать>
+```
+Выполнение обновления презентаций внутри docker контейнера после ручной доработки 
+```bash
+make update-cli DIR=<путь до директории, где находится .marp.md файл>
 ```
 
-Остановка
+Остановка работы сервисов
 ```bash
-make docker-down
+make docker-down # сворачивание контейнеров без удаления данных в БД
+make docker-down-v # сворачивание контейнеров с удалением данных в БД
 ```
 
 ## Команды Makefile
 |Команда|Описание|
 |-------|--------|
-|make install|Установка зависимостей|
-|make venv|Установка виртуального окружения|
-|make test|Запуск тестов|
+|make install|Установка python зависимостей|
+|make venv|Установка python виртуального окружения|
+|make test|Запуск pytest тестов|
 |make test-conv|Процент покрытия тестов|
-|make docker-build|Собрать контейнер модуля из образа|
-|make docker-up|Поднять контейнеры с LRS, Nextcloud, модулем|
-|make run-cli|Запуск cli (требует указания PLAN и OUTPUT)
+|make docker-build|Сборка docker контейнера модуля и тестового LRS сервера из docker образов|
+|make docker-up|Поднять контейнеры с LRS, Nextcloud, CLI модулем|
+|make docker-no-cache|Пересобрать docker контейнеры не используя кеши прошлой сборки|
+|make demo|Запуск заранее подготовленного тестового файла|
+|make demo-update|Обновление презентаций у тестового файла после ручной доработки|
+|make d-logs|Вывод логов о работе docker контейнеров|
+|make run-cli|Запуск CLI для генерации презентаций (требует указания PLAN и OUTPUT, FORMAT необязательный для указания)|
+|make update-cli|Запуск CLI для обновления презентаций после доработки (требует указания DIR, FORMAT необязательный для указания)|
+|make e|Установка проекта как модуль|
  
