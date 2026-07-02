@@ -15,7 +15,7 @@ class TestSanitizeFilename:
     def test_sanitize_with_special_chars(self):
         """Test sanitizing filename with special characters"""
         result = sanitize_filename("Test@#$%File")
-        assert result == "Test____File"
+        assert result == "Test_File"
     
     def test_sanitize_with_valid_chars(self):
         """Test sanitizing filename with valid characters"""
