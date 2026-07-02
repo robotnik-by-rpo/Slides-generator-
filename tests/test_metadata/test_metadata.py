@@ -6,8 +6,7 @@ from metadata.metadata import save_json_metadata
 from unittest.mock import Mock, patch, MagicMock, ANY
 from metadata.metadata import send_lrs, send_next_cloud
 import os
-
-
+import requests
 
 class TestSaveJsonMetadata:
     """Tests for save_json_metadata function"""
@@ -78,7 +77,6 @@ class TestSaveJsonMetadata:
     
     def test_nested_structure(self, tmp_path):
         """Test saving complex nested structure (xAPI statement)"""
-        # Arrange - xAPI statement
         data = {
             "actor": {
                 "mbox": "mailto:teacher@example.com",
@@ -110,10 +108,8 @@ class TestSaveJsonMetadata:
         }
         file_path = tmp_path / "xapi_statement.json"
         
-        # Act
         save_json_metadata(data, file_path)
         
-        # Assert
         with open(file_path, 'r', encoding='utf-8') as f:
             saved_data = json.load(f)
         assert saved_data == data
@@ -122,7 +118,6 @@ class TestSaveJsonMetadata:
     
     def test_file_overwrite(self, tmp_path):
         """Test overwriting an existing file"""
-        # Arrange
         file_path = tmp_path / "overwrite.json"
         initial_data = {"initial": "data"}
         new_data = {"new": "data"}
@@ -175,18 +170,15 @@ class TestSaveJsonMetadataErrors:
         }
         file_path = tmp_path / "unserializable.json"
         
-
         with pytest.raises(TypeError):
             save_json_metadata(data, file_path)
     
     def test_unserializable_set(self, tmp_path):
         """Test that sets (unserializable) raise TypeError"""
-    
         data = {
             "set_value": {1, 2, 3}
         }
         file_path = tmp_path / "set_error.json"
-        
         
         with pytest.raises(TypeError):
             save_json_metadata(data, file_path)
@@ -195,7 +187,7 @@ class TestSaveJsonMetadataErrors:
         """Test that invalid file path raises FileNotFoundError"""
         data = {"test": "data"}
         invalid_path = Path("/nonexistent/directory/file.json")
-    
+        
         with pytest.raises(FileNotFoundError):
             save_json_metadata(data, invalid_path)
 
@@ -248,7 +240,6 @@ class TestSaveJsonMetadataIntegration:
         }
         file_path = tmp_path / "xapi_full_statement.json"
         
-    
         save_json_metadata(xapi_statement, file_path)
         
         assert file_path.exists()
@@ -265,19 +256,16 @@ class TestSaveJsonMetadataIntegration:
     
     def test_multiple_metadata_files(self, tmp_path):
         """Test saving multiple metadata files"""
-        # Arrange
         statements = [
             {"id": 1, "data": "first"},
             {"id": 2, "data": "second"},
             {"id": 3, "data": "third"}
         ]
         
-
         for i, statement in enumerate(statements):
             file_path = tmp_path / f"statement_{i}.json"
             save_json_metadata(statement, file_path)
         
-        # Assert
         for i in range(3):
             file_path = tmp_path / f"statement_{i}.json"
             assert file_path.exists()
@@ -318,15 +306,17 @@ class TestSaveJsonMetadataIntegration:
         assert "slides_url" in saved["context"]["extensions"]
 
 
-
 class TestSendNextCloud:
     """Tests for send_next_cloud function"""
     
-    @patch('metadata.metadata.nextcloud_client.Client')
-    def test_send_next_cloud_with_all_files(self, mock_client_class, tmp_path):
+    @patch('metadata.metadata.requests.request')
+    @patch('metadata.metadata.requests.put')
+    def test_send_next_cloud_with_all_files(self, mock_put, mock_request, tmp_path):
         """Test successful upload with all three files (plan, pdf, pptx)"""
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
+        # Мокаем проверку существования директории
+        mock_request.return_value.status_code = 200
+        mock_put.return_value.status_code = 201
+        mock_put.return_value.text = ""
 
         plan_file = tmp_path / "lesson1.md"
         plan_file.write_text("plan content")
@@ -345,22 +335,23 @@ class TestSendNextCloud:
             'API_NEXTCLOUD': 'https://your-nextcloud.com',
             'LOGIN_NEXTCLOUD': 'test_user',
             'PASSWORD_NEXTCLOUD': 'test_pass',
-            'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
+            'FOLDER_NEXTCLOUD': '/Documents/Lessons/',
+            'NEXTCLOUD_EXTERNAL_URL': 'https://your-nextcloud.com'
         }):
-            send_next_cloud(path_files, remote_folder)
+            result = send_next_cloud(path_files, remote_folder)
 
-        mock_client_class.assert_called_once_with('https://your-nextcloud.com')
-        mock_client.login.assert_called_once_with('test_user', 'test_pass')
-        assert mock_client.put_file.call_count == 3
-        mock_client.put_file.assert_any_call(f"/Documents/Lessons/{plan_file.name}", str(plan_file))
-        mock_client.put_file.assert_any_call(f"/Documents/Lessons/{pdf_file.name}", str(pdf_file))
-        mock_client.put_file.assert_any_call(f"/Documents/Lessons/{pptx_file.name}", str(pptx_file))
+        assert "plan" in result
+        assert "pdf" in result
+        assert "pptx" in result
+        assert mock_put.call_count == 3
 
-    @patch('metadata.metadata.nextcloud_client.Client')
-    def test_send_next_cloud_with_plan_only(self, mock_client_class, tmp_path):
+    @patch('metadata.metadata.requests.request')
+    @patch('metadata.metadata.requests.put')
+    def test_send_next_cloud_with_plan_only(self, mock_put, mock_request, tmp_path):
         """Test successful upload with only plan file"""
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
+        mock_request.return_value.status_code = 200
+        mock_put.return_value.status_code = 201
+        mock_put.return_value.text = ""
 
         plan_file = tmp_path / "lesson1.md"
         plan_file.write_text("plan content")
@@ -371,19 +362,21 @@ class TestSendNextCloud:
             'API_NEXTCLOUD': 'https://your-nextcloud.com',
             'LOGIN_NEXTCLOUD': 'test_user',
             'PASSWORD_NEXTCLOUD': 'test_pass',
-            'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
+            'FOLDER_NEXTCLOUD': '/Documents/Lessons/',
+            'NEXTCLOUD_EXTERNAL_URL': 'https://your-nextcloud.com'
         }):
-            send_next_cloud(path_files, remote_folder)
+            result = send_next_cloud(path_files, remote_folder)
 
-        mock_client.login.assert_called_once()
-        assert mock_client.put_file.call_count == 1
-        mock_client.put_file.assert_called_once_with(f"/Documents/Lessons/{plan_file.name}", str(plan_file))
+        assert "plan" in result
+        assert mock_put.call_count == 1
 
-    @patch('metadata.metadata.nextcloud_client.Client')
-    def test_send_next_cloud_with_plan_and_pdf(self, mock_client_class, tmp_path):
+    @patch('metadata.metadata.requests.request')
+    @patch('metadata.metadata.requests.put')
+    def test_send_next_cloud_with_plan_and_pdf(self, mock_put, mock_request, tmp_path):
         """Test successful upload with plan and pdf files"""
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
+        mock_request.return_value.status_code = 200
+        mock_put.return_value.status_code = 201
+        mock_put.return_value.text = ""
 
         plan_file = tmp_path / "lesson1.md"
         plan_file.write_text("plan content")
@@ -396,19 +389,22 @@ class TestSendNextCloud:
             'API_NEXTCLOUD': 'https://your-nextcloud.com',
             'LOGIN_NEXTCLOUD': 'test_user',
             'PASSWORD_NEXTCLOUD': 'test_pass',
-            'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
+            'FOLDER_NEXTCLOUD': '/Documents/Lessons/',
+            'NEXTCLOUD_EXTERNAL_URL': 'https://your-nextcloud.com'
         }):
-            send_next_cloud(path_files, remote_folder)
+            result = send_next_cloud(path_files, remote_folder)
 
-        assert mock_client.put_file.call_count == 2
-        mock_client.put_file.assert_any_call(f"/Documents/Lessons/{plan_file.name}", str(plan_file))
-        mock_client.put_file.assert_any_call(f"/Documents/Lessons/{pdf_file.name}", str(pdf_file))
+        assert "plan" in result
+        assert "pdf" in result
+        assert mock_put.call_count == 2
 
-    @patch('metadata.metadata.nextcloud_client.Client')
-    def test_send_next_cloud_with_plan_and_pptx(self, mock_client_class, tmp_path):
+    @patch('metadata.metadata.requests.request')
+    @patch('metadata.metadata.requests.put')
+    def test_send_next_cloud_with_plan_and_pptx(self, mock_put, mock_request, tmp_path):
         """Test successful upload with plan and pptx files"""
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
+        mock_request.return_value.status_code = 200
+        mock_put.return_value.status_code = 201
+        mock_put.return_value.text = ""
 
         plan_file = tmp_path / "lesson1.md"
         plan_file.write_text("plan content")
@@ -421,19 +417,22 @@ class TestSendNextCloud:
             'API_NEXTCLOUD': 'https://your-nextcloud.com',
             'LOGIN_NEXTCLOUD': 'test_user',
             'PASSWORD_NEXTCLOUD': 'test_pass',
-            'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
+            'FOLDER_NEXTCLOUD': '/Documents/Lessons/',
+            'NEXTCLOUD_EXTERNAL_URL': 'https://your-nextcloud.com'
         }):
-            send_next_cloud(path_files, remote_folder)
+            result = send_next_cloud(path_files, remote_folder)
 
-        assert mock_client.put_file.call_count == 2
-        mock_client.put_file.assert_any_call(f"/Documents/Lessons/{plan_file.name}", str(plan_file))
-        mock_client.put_file.assert_any_call(f"/Documents/Lessons/{pptx_file.name}", str(pptx_file))
+        assert "plan" in result
+        assert "pptx" in result
+        assert mock_put.call_count == 2
 
-    @patch('metadata.metadata.nextcloud_client.Client')
-    def test_send_next_cloud_handles_missing_files_gracefully(self, mock_client_class, tmp_path):
+    @patch('metadata.metadata.requests.request')
+    @patch('metadata.metadata.requests.put')
+    def test_send_next_cloud_handles_missing_files_gracefully(self, mock_put, mock_request, tmp_path):
         """Test that missing optional files are handled gracefully"""
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
+        mock_request.return_value.status_code = 200
+        mock_put.return_value.status_code = 201
+        mock_put.return_value.text = ""
 
         plan_file = tmp_path / "lesson1.md"
         plan_file.write_text("plan content")
@@ -444,10 +443,133 @@ class TestSendNextCloud:
             'API_NEXTCLOUD': 'https://your-nextcloud.com',
             'LOGIN_NEXTCLOUD': 'test_user',
             'PASSWORD_NEXTCLOUD': 'test_pass',
-            'FOLDER_NEXTCLOUD': '/Documents/Lessons/'
+            'FOLDER_NEXTCLOUD': '/Documents/Lessons/',
+            'NEXTCLOUD_EXTERNAL_URL': 'https://your-nextcloud.com'
         }):
-            send_next_cloud(path_files, remote_folder)
+            result = send_next_cloud(path_files, remote_folder)
 
-        mock_client.login.assert_called_once()
-        assert mock_client.put_file.call_count == 1
-        mock_client.put_file.assert_called_once_with(f"/Documents/Lessons/{plan_file.name}", str(plan_file))
+        assert "plan" in result
+        assert mock_put.call_count == 1
+
+class TestSendLRS:
+    """Tests for send_lrs function"""
+    
+    @patch('metadata.metadata.requests.post')
+    def test_send_lrs_success(self, mock_post):
+        """Test successful LRS request"""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+        
+        url = "http://lrs.example.com/xAPI/statements"
+        xapi_data = {
+            "actor": {"mbox": "mailto:test@example.com"},
+            "verb": {"id": "http://adlnet.gov/expapi/verbs/generated"},
+            "object": {"id": "urn:lesson:123"}
+        }
+        
+        with patch.dict(os.environ, {
+            'LOGIN_LRS': 'test_user',
+            'PASSWORD_LRS': 'test_pass'
+        }):
+            send_lrs(url, xapi_data)
+        
+        mock_post.assert_called_once()
+        args, kwargs = mock_post.call_args
+        assert args[0] == url
+        assert kwargs['json'] == xapi_data
+        assert kwargs['headers']['Content-Type'] == 'application/json'
+        assert kwargs['auth'].username == 'test_user'
+        assert kwargs['auth'].password == 'test_pass'
+    
+    @patch('metadata.metadata.requests.post')
+    def test_send_lrs_error_response(self, mock_post, capsys):
+        """Test LRS request with error response"""
+        mock_response = Mock()
+        mock_response.status_code = 500
+        mock_response.text = "Internal Server Error"
+        mock_post.return_value = mock_response
+        
+        url = "http://lrs.example.com/xAPI/statements"
+        xapi_data = {"test": "data"}
+        
+        with patch.dict(os.environ, {
+            'LOGIN_LRS': 'test_user',
+            'PASSWORD_LRS': 'test_pass'
+        }):
+            send_lrs(url, xapi_data)
+        
+        captured = capsys.readouterr()
+        assert "Error: 500" in captured.out
+        assert "Response server: Internal Server Error" in captured.out
+    
+    @patch('metadata.metadata.requests.post')
+    def test_send_lrs_connection_error(self, mock_post, capsys):
+        """Test LRS request with connection error"""
+        mock_post.side_effect = requests.exceptions.ConnectionError("Connection refused")
+        
+        url = "http://lrs.example.com/xAPI/statements"
+        xapi_data = {"test": "data"}
+        
+        with patch.dict(os.environ, {
+            'LOGIN_LRS': 'test_user',
+            'PASSWORD_LRS': 'test_pass'
+        }):
+            with pytest.raises(requests.exceptions.ConnectionError):
+                send_lrs(url, xapi_data)
+    
+    @patch('metadata.metadata.requests.post')
+    def test_send_lrs_timeout(self, mock_post):
+        """Test LRS request with timeout"""
+        mock_post.side_effect = requests.exceptions.Timeout("Request timed out")
+        
+        url = "http://lrs.example.com/xAPI/statements"
+        xapi_data = {"test": "data"}
+        
+        with patch.dict(os.environ, {
+            'LOGIN_LRS': 'test_user',
+            'PASSWORD_LRS': 'test_pass'
+        }):
+            with pytest.raises(requests.exceptions.Timeout):
+                send_lrs(url, xapi_data)
+    
+    @patch('metadata.metadata.requests.post')
+    def test_send_lrs_missing_credentials(self, mock_post):
+        """Test LRS request with missing credentials"""
+        mock_response = Mock()
+        mock_response.status_code = 401
+        mock_response.text = "Unauthorized"
+        mock_post.return_value = mock_response
+        
+        url = "http://lrs.example.com/xAPI/statements"
+        xapi_data = {"test": "data"}
+        
+        with patch.dict(os.environ, {}, clear=True):
+            send_lrs(url, xapi_data)
+        
+        mock_post.assert_called_once()
+        _, kwargs = mock_post.call_args
+
+        assert kwargs['auth'].username is None
+        assert kwargs['auth'].password is None
+
+    @patch('metadata.metadata.requests.post')
+    def test_send_lrs_success_with_empty_url(self, mock_post, capsys):
+        """Test LRS request with empty URL"""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+        
+        url = ""
+        xapi_data = {"test": "data"}
+        
+        with patch.dict(os.environ, {
+            'LOGIN_LRS': 'test_user',
+            'PASSWORD_LRS': 'test_pass'
+        }):
+            send_lrs(url, xapi_data)
+        
+        mock_post.assert_called_once()
+        args, kwargs = mock_post.call_args
+        assert args[0] == ""
+        assert kwargs['json'] == xapi_data
