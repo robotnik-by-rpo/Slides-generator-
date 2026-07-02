@@ -35,7 +35,6 @@ def test_main_generation_all_formats(mock_send_lrs, mock_save_json, mock_send_ne
     mock_parser_instance.title = "Test Lesson Plan"
     mock_parser_md.return_value = mock_parser_instance
 
-    # Return different values for each call to send_next_cloud
     mock_send_nextcloud.side_effect = [
         {
             "plan": "http://fake/plan.md",
@@ -58,7 +57,6 @@ def test_main_generation_all_formats(mock_send_lrs, mock_save_json, mock_send_ne
     mock_parser_md.assert_called_once_with(temp_plan_file, output_dir, "default", "fake-api-key")
     mock_convert.assert_called_once()
     
-    # send_next_cloud should be called twice (once for files, once for metadata)
     assert mock_send_nextcloud.call_count == 2
     
     # Check first call - files
@@ -148,7 +146,6 @@ def test_main_generation_with_title_sanitization(mock_send_lrs, mock_save_json, 
     local_files = first_call_args[0]
     pdf_path = local_files.get("pdf", "")
     
-    # The sanitized name should have underscores instead of special chars
     assert "My_Test" in pdf_path
     assert "Lesson" in pdf_path
     assert pdf_path.endswith(".pdf")
@@ -244,7 +241,6 @@ def test_process_update_mode_no_metadata(cli_instance, tmp_path, marp_file_with_
                     
                     saved_xapi = mock_save.call_args[0][0]
                     extensions = saved_xapi["context"]["extensions"]
-                    # Проверяем, что используются пустые URL из старого metadata
                     assert extensions["plan_url"] == ""
                     assert extensions["slides_url_pdf"] == ""
                     assert extensions["slides_url_pptx"] == ""
