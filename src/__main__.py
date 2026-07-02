@@ -7,6 +7,7 @@ from parse.parse import ParserMD
 from metadata.metadata import save_json_metadata, send_lrs, send_next_cloud
 from generate.generate import convert_to_marp, sanitize_filename
 from datetime import datetime
+import stat
 
 class CLI:
     def __init__(self):
@@ -17,7 +18,6 @@ class CLI:
             self.api_ai = os.environ.get('API_AI')
             self.login_lrs = os.environ.get("LOGIN_LRS")
             self.next_cloud_url = os.environ.get("API_NEXTCLOUD")
-            self.api_marp = os.environ.get('API_KEY_MARP') # In future
             self.plan_path = ""
             self.output_dir = ""
             self.title = ""
@@ -76,18 +76,18 @@ class CLI:
 
             self.plan_path = Path(args.plan)
             self.output_dir = self.main_directory / Path(args.output)
-            self.output_dir.mkdir(parents=True, exist_ok=True)            
+            create_directory_with_permissions(self.output_dir)
 
             if not self.plan_path.exists() and not args.update:
                 raise FileNotFoundError(f"File .md doesn't exist: {args.plan}")
             
             # Creating output directory
             parser_md = ParserMD(self.plan_path, self.output_dir, self.marp_theme, self.api_ai)
-            path_marp_md = parser_md.Parse_file_to_marp()
+            path_marp_md = parser_md.parse_file_to_marp()
             self.title = parser_md.title
 
             safe_title = sanitize_filename(self.title)
-            convert_to_marp(path_marp_md, args.format, output_dir=self.output_dir, base_name=self.title)
+            convert_to_marp(path_marp_md, args.format, output_dir=self.output_dir, base_name=safe_title)
             
             local_files = {
                 "plan": str(self.plan_path),
@@ -105,38 +105,48 @@ class CLI:
             remote_folder = f"/{os.environ.get('FOLDER_NEXTCLOUD', '').strip('/')}/{output_folder_name}"
             
             uploaded_urls = send_next_cloud(local_files, remote_folder)
-
-            xAPI = {
-                    "actor": {
-                    "mbox": self.login_lrs,
-                    },
-                    "verb": {
-                        "id": "http://adlnet.gov/expapi/verbs/generated",
-                        "display": {
-                            "ru": "Генерация презентации"
-                        }
-                    },
-                    "object": {
-                        "id": f"urn:lesson:{self.title}",
-                        "definition": {
-                            "name": {
-                                "ru": self.title,
-                            }
-                        }
-                    },
-                    "context": {
-                        "extensions": {
-                            "plan_url": uploaded_urls.get("plan",""),
-                            "slides_url_pdf": uploaded_urls.get("pdf",""),
-                            "slides_url_pptx": uploaded_urls.get("pptx",""),
-                            "slides_url_html": uploaded_urls.get("html","")
-                        }
-                    },
-                    "timestamp": datetime.now().isoformat(timespec='seconds')
-                }
             
-            save_json_metadata(xAPI, self.output_dir / "metadata.json")
-            send_lrs(self.lrs_url,xAPI)
+            metadata_path = self.output_dir / "metadata.json"
+            
+            xAPI = {
+                "actor": {
+                    "mbox": self.login_lrs,
+                },
+                "verb": {
+                    "id": "http://adlnet.gov/expapi/verbs/generated",
+                    "display": {
+                        "ru": "Генерация презентации"
+                    }
+                },
+                "object": {
+                    "id": f"urn:lesson:{safe_title}",
+                    "definition": {
+                        "name": {
+                            "ru": self.title,
+                        }
+                    }
+                },
+                "context": {
+                    "extensions": {
+                        "plan_url": uploaded_urls.get("plan", ""),
+                        "slides_url_pdf": uploaded_urls.get("pdf", ""),
+                        "slides_url_pptx": uploaded_urls.get("pptx", ""),
+                        "slides_url_html": uploaded_urls.get("html", "")
+                    }
+                },
+                "timestamp": datetime.now().isoformat(timespec='seconds')
+            }
+            
+            save_json_metadata(xAPI, metadata_path)
+            
+            local_files_metadata = {"metadata": str(metadata_path)}
+            metadata_urls = send_next_cloud(local_files_metadata, remote_folder)
+            
+            xAPI["context"]["extensions"]["metadata_url"] = metadata_urls.get("metadata", "")
+            
+            save_json_metadata(xAPI, metadata_path)
+            
+            send_lrs(self.lrs_url, xAPI)
             return 0
         except Exception as e:
             print(e, file=sys.stderr)
@@ -148,7 +158,7 @@ class CLI:
 
         Args:
             directory: path for saving directory
-            format_choice: format to saving
+            format_choice: format to saving 
         """
         try:
             marp_files = list(directory.glob("*.marp.md"))
@@ -164,7 +174,7 @@ class CLI:
             base_name = marp_file.stem.replace('.marp', '')
             self.title = self._extract_title_from_marp(marp_file)
             print(f"Updating presentation for: {base_name}")
-            safe_base = sanitize_filename(base_name)
+            safe_base = sanitize_filename(self.title)
             convert_to_marp(marp_file,format_choice,output_dir=directory,base_name=safe_base)
             
             local_files = {}
@@ -180,40 +190,50 @@ class CLI:
 
             old_metadata = self._get_plan_from_metadata(directory / "metadata.json")
 
+            uploaded_urls = send_next_cloud(local_files, remote_folder)
+
             xAPI = {
-                    "actor": {
+                "actor": {
                     "mbox": self.login_lrs,
-                    },
-                    "verb": {
-                        "id": "http://adlnet.gov/expapi/verbs/updated",
-                        "display": {
-                            "ru": "Обновление презентации"
+                },
+                "verb": {
+                    "id": "http://adlnet.gov/expapi/verbs/updated",
+                    "display": {
+                        "ru": "Обновление презентации"
+                    }
+                },
+                "object": {
+                    "id": f"urn:lesson:{self.title}",
+                    "definition": {
+                        "name": {
+                            "ru": self.title,
                         }
-                    },
-                    "object": {
-                        "id": f"urn:lesson:{self.title}",
-                        "definition": {
-                            "name": {
-                                "ru": self.title,
-                            }
-                        }
-                    },
-                    "context": {
-                        "extensions": {
-                            "plan_url": old_metadata.get("plan_url",""),
-                            "slides_url_pdf": old_metadata.get("slides_url_pdf",""),
-                            "slides_url_pptx": old_metadata.get("slides_url_pptx",""),
-                            "slides_url_html": old_metadata.get("slides_url_html","")
-                        }
-                    },
-                    "timestamp": datetime.now().isoformat(timespec='seconds')
-                }
+                    }
+                },
+                "context": {
+                    "extensions": {
+                        "plan_url": uploaded_urls.get("plan", old_metadata.get("plan_url", "")),
+                        "slides_url_pdf": uploaded_urls.get("pdf", old_metadata.get("slides_url_pdf", "")),
+                        "slides_url_pptx": uploaded_urls.get("pptx", old_metadata.get("slides_url_pptx", "")),
+                        "slides_url_html": uploaded_urls.get("html", old_metadata.get("slides_url_html", "")),
+                        "metadata_url": old_metadata.get("metadata_url", "")
+                    }
+                },
+                "timestamp": datetime.now().isoformat(timespec='seconds')
+            }
             
-            save_json_metadata(xAPI, directory / "metadata.json")
-            local_files["metadata"] = str(directory / "metadata.json")
-            send_next_cloud(local_files, remote_folder)
-        
-            send_lrs(self.lrs_url,xAPI)
+            metadata_path = directory / "metadata.json"
+            save_json_metadata(xAPI, metadata_path)
+            
+            local_files_metadata = {"metadata": str(metadata_path)}
+            metadata_urls = send_next_cloud(local_files_metadata, remote_folder)
+            
+            xAPI["context"]["extensions"]["metadata_url"] = metadata_urls.get("metadata", old_metadata.get("metadata_url", ""))
+            
+            save_json_metadata(xAPI, metadata_path)
+            
+            send_lrs(self.lrs_url, xAPI)
+            
             return 0
             
         except Exception as e:
@@ -262,6 +282,17 @@ class CLI:
             print(f"Could not read metadata: {e}")
             return {}
         
+        
+def create_directory_with_permissions(path: Path):
+    """
+    Create directory
+    """
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        print(f"Created directory: {path}")
+    except Exception as e:
+        print(f"Could not set permissions for {path}: {e}")
+
 if __name__ == "__main__":
     cli = CLI()
     sys.exit(cli.main())
