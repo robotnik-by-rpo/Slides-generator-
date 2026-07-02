@@ -36,14 +36,29 @@ documentation for details.
 
 .. code-block:: bash
 
-   # Обязательные
-   API_AI=your_groq_api_key
-   SLIDES_OUTPUT_FOLDER=/path/to/output
-   LRS_ENDPOINT=http://localhost:8000/xAPI/statements
-   API_NEXTCLOUD=http://localhost:8080
+   # Токены приложения
+   SLIDES_OUTPUT_FOLDER=Директория_для_сохранения_результатов
+   THEME_MARP=Тема_оформления_слайдов_в_marp
+   API_AI=API_LLM_модели_(в_коде_используются_запросы_к_API_Groq)
 
-   # Опциональные
-   THEME_MARP=default
+   # Токены для LRS 
+   LRS_ENDPOINT=URL_для_отправки_xAPI-стейтментов
+   LOGIN_LRS=Логин_для_индификации_в_LRS_платформе
+   API_NEXTCLOUD=URL_Nextcloud_для_загрузки_файлов_в_docker_сети
+
+   # Nextcloud
+   FOLDER_NEXTCLOUD=Папка_в_Nextcloud_для_сохранения
+   NEXTCLOUD_EXTERNAL_URL=URL_для_загрузки_файлов
+   NEXTCLOUD_DB_HOST=Хост/адрес_сервера_PostgreSQL(имя_контейнера_с_postgreSQL_для_Nextcloud)
+   NEXTCLOUD_DB=Имя_базы_данных,_которую_будет_использовать_Nextcloud
+   NEXTCLOUD_USER=Имя_пользователя_для_подключения_к_PostgreSQL
+   NEXTCLOUD_PASSWORD=Пароль_пользователя_PostgreSQL
+   NEXTCLOUD_ADMIN_USER=Имя_администратора_Nextcloud 
+   NEXTCLOUD_ADMIN_PASSWORD=Пароль_администратора_Nextcloud
+   NEXTCLOUD_TRUSTED_DOMAINS=Доверенные_домены,_с_которых_можно_обращаться_к_Nextcloud_(например,_localhost,_your-domain.com)
+   OVERWRITEPROTOCOL=Протокол_для_переопределения 
+   OVERWRITEHOST=Хост_для_переопределения
+   OVERWRITEWEBROOT=Корень_веб-приложения
    
 
 Документация разработчика
