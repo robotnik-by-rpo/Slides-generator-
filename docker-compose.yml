@@ -15,7 +15,6 @@ services:
       - LOGIN_NEXTCLOUD=${LOGIN_NEXTCLOUD}
       - PASSWORD_NEXTCLOUD=${PASSWORD_NEXTCLOUD}
       - FOLDER_NEXTCLOUD=${FOLDER_NEXTCLOUD}
-      - API_KEY_MARP=${API_KEY_MARP}
     volumes:
       - ./data:/app/data
       - ./output:/app/output
@@ -28,57 +27,23 @@ services:
         condition: service_healthy
     networks:
       - slider-network
-    restart: unless-stopped
 
   lrs:
     build:
-      context: .
-      dockerfile: Dockerfile.ralph
-    container_name: lrs-ralph
-    environment:
-      - LRS_DB_HOST=${LRS_DB_HOST}
-      - LRS_DB_NAME=${LRS_DB_NAME}
-      - LRS_DB_USER=${LRS_DB_USER}
-      - LRS_DB_PASSWORD=${LRS_DB_PASSWORD}
-      - LRS_SECRET_KEY=${LRS_SECRET_KEY}
-      - LRS_ADMIN_USERNAME=${LRS_ADMIN_USERNAME}
-      - LRS_ADMIN_PASSWORD=${LRS_ADMIN_PASSWORD}
-      - LRS_ALLOWED_HOSTS=${LRS_ALLOWED_HOSTS}
-      - LRS_DEBUG=${LRS_DEBUG}
-      - LRS_HTTP_AUTH_USERNAME=${LRS_HTTP_AUTH_USERNAME}
-      - LRS_HTTP_AUTH_PASSWORD=${LRS_HTTP_AUTH_PASSWORD}
+      context: ./lrs_server
+      dockerfile: Dockerfile.lrs
+    container_name: lrs-test
     ports:
       - "8000:8000"
-    depends_on:
-      postgres-ralph:
-        condition: service_healthy
     networks:
       - slider-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]      
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
-
-  postgres-ralph:
-    image: postgres:15-alpine
-    container_name: postgres-ralph
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB_RALPH}
-      - POSTGRES_USER=${POSTGRES_USER_RALPH}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD_RALPH}
-    volumes:
-      - postgres_ralph_data:/var/lib/postgresql/data
-    networks:
-      - slider-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER_RALPH}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
+      
   nextcloud:
     image: nextcloud:29-apache
     container_name: nextcloud-test
@@ -133,6 +98,5 @@ networks:
     driver: bridge
 
 volumes:
-  postgres_ralph_data:
   nextcloud_data:
   nextcloud_db_data:
