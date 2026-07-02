@@ -10,7 +10,9 @@ def sanitize_filename(name: str) -> str:
         name: name of file
 
     """
-    safe = re.sub(r'[^a-zA-Z0-9_\-]', '_', name)
+    safe = re.sub(r'[^a-zA-Zа-яА-Я0-9_\-\s]', '_', name)
+    safe = re.sub(r'\s+', '_', safe)
+    safe = re.sub(r'_+', '_', safe)
     safe = safe.strip('_')
     return safe if safe else 'presentation'
 
