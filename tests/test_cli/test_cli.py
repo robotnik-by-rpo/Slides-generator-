@@ -59,7 +59,6 @@ def test_main_generation_all_formats(mock_send_lrs, mock_save_json, mock_send_ne
     
     assert mock_send_nextcloud.call_count == 2
     
-    # Check first call - files
     first_call_args = mock_send_nextcloud.call_args_list[0][0]
     local_files = first_call_args[0]
     assert "plan" in local_files
@@ -70,7 +69,7 @@ def test_main_generation_all_formats(mock_send_lrs, mock_save_json, mock_send_ne
     remote_folder = first_call_args[1]
     assert remote_folder == "/slides/output"
     
-    mock_save_json.assert_called_once()
+    assert mock_save_json.call_count == 2
     mock_send_lrs.assert_called_once()
 
 
@@ -109,6 +108,8 @@ def test_main_generation_pdf_only(mock_send_lrs, mock_save_json, mock_send_nextc
     assert "pdf" in local_files
     assert "pptx" not in local_files
     assert "html" not in local_files
+    
+    assert mock_save_json.call_count == 2
 
 
 @patch('src.__main__.ParserMD')
@@ -149,6 +150,8 @@ def test_main_generation_with_title_sanitization(mock_send_lrs, mock_save_json, 
     assert "My_Test" in pdf_path
     assert "Lesson" in pdf_path
     assert pdf_path.endswith(".pdf")
+    
+    assert mock_save_json.call_count == 2
 
 
 @patch('src.__main__.convert_to_marp')
@@ -182,7 +185,7 @@ def test_process_update_mode_all_formats(mock_send_lrs, mock_save_json, mock_sen
     assert "pptx" in local_files
     assert "html" in local_files
     
-    mock_save_json.assert_called_once()
+    assert mock_save_json.call_count == 2
     mock_send_lrs.assert_called_once()
 
 
@@ -211,6 +214,8 @@ def test_process_update_mode_pdf_only(mock_send_lrs, mock_save_json, mock_send_n
     assert "pdf" in local_files
     assert "pptx" not in local_files
     assert "html" not in local_files
+    
+    assert mock_save_json.call_count == 2
 
 
 def test_process_update_mode_no_metadata(cli_instance, tmp_path, marp_file_with_title):
@@ -236,15 +241,18 @@ def test_process_update_mode_no_metadata(cli_instance, tmp_path, marp_file_with_
                         }
                     ]
                     
-                    ret = cli_instance.process_update_mode(update_dir, "all")
-                    assert ret == 0
-                    
-                    saved_xapi = mock_save.call_args[0][0]
-                    extensions = saved_xapi["context"]["extensions"]
-                    assert extensions["plan_url"] == ""
-                    assert extensions["slides_url_pdf"] == ""
-                    assert extensions["slides_url_pptx"] == ""
-                    assert extensions["slides_url_html"] == ""
+                    with patch.object(cli_instance, '_get_plan_from_metadata', return_value={}):
+                        ret = cli_instance.process_update_mode(update_dir, "all")
+                        assert ret == 0
+                        
+                        assert mock_save.call_count == 2
+                        
+                        second_call_args = mock_save.call_args_list[1][0][0]
+                        extensions = second_call_args["context"]["extensions"]
+                        assert extensions["plan_url"] == "http://fake/plan.md"
+                        assert extensions["slides_url_pdf"] == "http://fake/test.pdf"
+                        assert extensions["slides_url_pptx"] == "http://fake/test.pptx"
+                        assert extensions["slides_url_html"] == "http://fake/test.html"
 
 
 def test_process_update_mode_no_marp_files(cli_instance, tmp_path):
