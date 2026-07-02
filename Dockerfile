@@ -1,17 +1,15 @@
-FROM python:3.12-slim
+FROM python:3.14-slim
 
-ENV DEBIAN_FRONTEND=non-interactive \
-    PYTHONUNBUFFERED=1 \
-    NODE_VERSION=20.x \
-    CHROME_BIN=/usr/bin/chromium \
-    PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=non-interactive
 
-RUN apt-get update && apt-get install -y \
+# Установка Chromium и всех зависимостей для Puppeteer
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     gnupg \
     ca-certificates \
+    chromium \
     fonts-liberation \
     libasound2 \
     libatk-bridge2.0-0 \
@@ -42,34 +40,35 @@ RUN apt-get update && apt-get install -y \
     libxtst6 \
     lsb-release \
     xdg-utils \
+    sudo \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION} | bash - \
-    && apt-get install -y nodejs \
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-
-RUN apt-get update && apt-get install -y \
-    chromium \
-    chromium-driver \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN npm install -g @marp-team/marp-cli
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY requirements_docker.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements_docker.txt
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN npm install -g @marp-team/marp-cli
+
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+RUN marp --version && \
+    which chromium
 
 COPY . .
 
 RUN pip install -e .
 
-RUN mkdir -p /app/output
+RUN mkdir -p /app/data /app/output && \
+    chmod 755 /app/data /app/output
 
 ENTRYPOINT ["python", "-m", "src.__main__"]
-
 CMD ["--help"]
