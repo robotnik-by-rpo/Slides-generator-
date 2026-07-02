@@ -114,7 +114,7 @@ class ParserMD:
         """
         if not self.api_key:
             raise ValueError("API key is required for generating presentation")
-        
+        print(f"Using API key: {self.api_key[:10]}...")
         system_prompt = self.prompts['system']
         user_prompt = self.prompts['user_template'].format(
             plan_content=plan_content,
@@ -129,13 +129,13 @@ class ParserMD:
         }
         
         data = {
-            "model": "llama3-70b-8192",
+            "model": "llama-3.3-70b-versatile",
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
             "temperature": 0.7,
-            "max_tokens": 5000,
+            "max_tokens": 4000,
             "top_p": 1
         }
         
