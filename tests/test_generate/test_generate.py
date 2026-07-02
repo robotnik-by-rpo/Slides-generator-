@@ -56,7 +56,7 @@ class TestConvertToMarp:
             convert_to_marp(sample_input_file, "pdf")
             
             expected_path = sample_input_file.parent / "test.pdf"
-            expected_command = ['marp', sample_input_file, '--pdf', '-o', expected_path]
+            expected_command = ['marp', sample_input_file,'--allow-local-files', '--pdf', '-o', expected_path]
             mock_run.assert_called_once_with(
                 expected_command, 
                 check=True, 
@@ -71,7 +71,7 @@ class TestConvertToMarp:
             convert_to_marp(sample_input_file, "pptx")
             
             expected_path = sample_input_file.parent / "test.pptx"
-            expected_command = ['marp', sample_input_file, '--pptx', '-o', expected_path]
+            expected_command = ['marp', sample_input_file,'--allow-local-files', '--pptx', '-o', expected_path]
             mock_run.assert_called_once_with(
                 expected_command, 
                 check=True, 
@@ -86,7 +86,7 @@ class TestConvertToMarp:
             convert_to_marp(sample_input_file, "html")
             
             expected_path = sample_input_file.parent / "test.html"
-            expected_command = ['marp', sample_input_file, '--html', '-o', expected_path]
+            expected_command = ['marp', sample_input_file,'--allow-local-files', '--html', '-o', expected_path]
             mock_run.assert_called_once_with(
                 expected_command, 
                 check=True, 
@@ -106,9 +106,9 @@ class TestConvertToMarp:
             expected_pptx_path = sample_input_file.parent / "test.pptx"
             expected_html_path = sample_input_file.parent / "test.html"
             
-            expected_pdf = ['marp', sample_input_file, '--pdf', '-o', expected_pdf_path]
-            expected_pptx = ['marp', sample_input_file, '--pptx', '-o', expected_pptx_path]
-            expected_html = ['marp', sample_input_file, '--html', '-o', expected_html_path]
+            expected_pdf = ['marp', sample_input_file,'--allow-local-files', '--pdf', '-o', expected_pdf_path]
+            expected_pptx = ['marp', sample_input_file,'--allow-local-files', '--pptx', '-o', expected_pptx_path]
+            expected_html = ['marp', sample_input_file,'--allow-local-files', '--html', '-o', expected_html_path]
             
             mock_run.assert_any_call(expected_pdf, check=True, stderr=subprocess.DEVNULL)
             mock_run.assert_any_call(expected_pptx, check=True, stderr=subprocess.DEVNULL)
@@ -130,7 +130,7 @@ class TestConvertToMarp:
             )
             
             expected_path = custom_dir / "Custom_Name_With_Spaces.pdf"
-            expected_command = ['marp', sample_input_file, '--pdf', '-o', expected_path]
+            expected_command = ['marp', sample_input_file,'--allow-local-files', '--pdf', '-o', expected_path]
             mock_run.assert_called_once_with(
                 expected_command,
                 check=True,
@@ -153,7 +153,7 @@ class TestConvertToMarp:
             )
             
             expected_path = custom_dir / "clean_name.pdf"
-            expected_command = ['marp', sample_input_file, '--pdf', '-o', expected_path]
+            expected_command = ['marp', sample_input_file,'--allow-local-files', '--pdf', '-o', expected_path]
             mock_run.assert_called_once_with(
                 expected_command,
                 check=True,
@@ -185,7 +185,7 @@ class TestConvertToMarp:
             convert_to_marp(input_file, "pdf")
             
             expected_path = tmp_path / "presentation.pdf"
-            expected_command = ['marp', input_file, '--pdf', '-o', expected_path]
+            expected_command = ['marp', input_file,'--allow-local-files', '--pdf', '-o', expected_path]
             mock_run.assert_called_once_with(
                 expected_command,
                 check=True,
@@ -207,7 +207,7 @@ class TestConvertToMarp:
             )
             
             expected_path = absolute_dir / "test.pdf"
-            expected_command = ['marp', sample_input_file, '--pdf', '-o', expected_path]
+            expected_command = ['marp', sample_input_file,'--allow-local-files', '--pdf', '-o', expected_path]
             mock_run.assert_called_once_with(
                 expected_command,
                 check=True,
