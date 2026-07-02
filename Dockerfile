@@ -3,7 +3,6 @@ FROM python:3.14-slim
 ENV PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=non-interactive
 
-# Установка Chromium и всех зависимостей для Puppeteer
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
