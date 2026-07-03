@@ -50,7 +50,7 @@ run-cli:
 		echo "Error: OUTPUT is required. Usage: make run-cli PLAN=path/to/lesson.md OUTPUT=path/to/output"; \
 		exit 1; \
 	fi
-	docker compose run --rm slider-generator  --plan $(PLAN) --output $(OUTPUT) a --format $(or $(FORMAT),all)
+	docker compose run --rm slider-generator  --plan $(PLAN) --output $(OUTPUT) --format $(or $(FORMAT),all)
 
 update-cli:
 	@if [ -z "$(DIR)" ]; then \
