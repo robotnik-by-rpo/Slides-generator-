@@ -203,7 +203,7 @@ class CLI:
                     }
                 },
                 "object": {
-                    "id": f"urn:lesson:{self.title}",
+                    "id": f"urn:lesson:{safe_base}",
                     "definition": {
                         "name": {
                             "ru": self.title,
